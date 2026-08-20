@@ -94,17 +94,52 @@
   .msg { font-size:13px; color:var(--dim); }
   .err { color:#ff6b6b; font-size:14px; }
   .slime { image-rendering:pixelated; height:44px; vertical-align:middle; margin-right:8px; border-radius:6px; }
+  .pick { display:grid; grid-template-columns:repeat(auto-fit, minmax(96px, 1fr)); gap:10px; margin:8px 0; }
+  .pk { text-align:center; border:2px solid #555; border-radius:10px; background:#0c0c30; padding:8px 4px; cursor:pointer; }
+  .pk img { image-rendering:pixelated; width:64px; height:64px; object-fit:contain; }
+  .pk .n { font-size:13px; }
+  .pk .c { font-size:11px; color:var(--dim); }
+  .pk.sel { border-color:var(--gold); box-shadow:0 0 10px #ffd75e66; }
+  .cform input { background:#0c0c30; color:#fff; border:2px solid #fff; border-radius:6px;
+                 font-family:inherit; font-size:14px; padding:6px 8px; width:100%; }
+  .cform label { font-size:12px; color:var(--dim); display:block; margin:8px 0 2px; }
+  .card.mine { border-color:var(--gold); box-shadow:0 0 14px #ffd75e55, 4px 5px 0 rgba(0,0,0,.5); }
+  .youbadge { color:var(--gold); font-size:11px; border:1px solid var(--gold); border-radius:6px; padding:0 4px; margin-left:6px; }
   footer { text-align:center; color:var(--dim); font-size:11px; margin-top:18px; }
 </style>
 </head>
 <body>
 <div class="wrap">
 
+<div id="createScreen" style="display:none">
+  <div class="win" style="text-align:center">
+    <h1>⚔ TORIDOLL QUEST</h1>
+    <div class="sub">マルガメア王国 冒険者ギルド ― 登録の間</div>
+  </div>
+  <div class="win">
+    <h2>そなたは、だれだ？（じぶんのすがたを えらべ）</h2>
+    <div class="pick" id="pickGrid"></div>
+    <div class="cform" id="createForm" style="display:none">
+      <h2 id="cfTitle">キャラクターをつくる</h2>
+      <label>二つ名（じぶんで名のる・必須）</label><input id="cAlias" maxlength="24" placeholder="例：出典の狩人">
+      <label>特技（ゼミ内外なんでも）</label><input id="cSkill" maxlength="40">
+      <label>弱点（宣言すると SOS が出しやすくなる）</label><input id="cWeak" maxlength="40">
+      <label>趣味</label><input id="cHobby" maxlength="40">
+      <label>意気込み（みんなに見える 1行の公約）</label><input id="cVow" maxlength="80">
+      <label>丸亀製麺の推しメニュー</label><input id="cMenu" maxlength="40">
+      <div id="cAikoRow" style="margin-top:8px"><input id="cAiko" placeholder="あいことば（Classroomの投稿にある）"></div>
+      <div class="frow" style="margin-top:10px"><button class="cmd gold" id="cGo" onclick="charSave()">▶ ぼうけんに でる</button><span class="msg" id="cMsg"></span></div>
+    </div>
+    <div class="sub" style="margin-top:10px"><a href="#" id="skipCreate" style="color:var(--dim)">▶ 見学ではいる（キャラはつくらない）</a></div>
+  </div>
+</div>
+
+<div id="mainScreen">
   <div class="win">
     <div class="toprow">
       <div>
         <h1>⚔ マルガメア王国ダッシュボード</h1>
-        <div class="sub">TORIDOLL QUEST ― きょうの一歩は、ここからはじまる。</div>
+        <div class="sub" id="hsub">TORIDOLL QUEST ― きょうの一歩は、ここからはじまる。</div>
       </div>
       <img class="dragon" id="dragon" alt="カマアゲドラゴン">
     </div>
@@ -187,10 +222,12 @@
     <img class="slime" id="slime" alt="うどんスライム">
     <button class="cmd" onclick="loadAll()">▶ さいよみこみ</button>
     <a class="cmd" href="https://classroom.google.com" target="_blank" rel="noopener">▶ Classroomへ</a>
+    <a class="cmd" href="#" onclick="reopenCreate();return false">▶ キャラをなおす</a>
     <span class="msg" id="status">よみこみちゅう…</span>
   </div>
 
   <footer>マルガメア王国 御用達 ― データは盤面より自動転写（5分ごと更新）／クエスト・バトルのそうさは盤面で</footer>
+</div>
 </div>
 
 <script>
@@ -221,6 +258,109 @@ const SPRITES = {
 };
 document.getElementById("dragon").src = SPRITES["dragon"];
 document.getElementById("slime").src = SPRITES["slime"];
+
+/* ---------- 登録の間（キャラクタークリエイト） ---------- */
+const CLASSMAP = {"ケイタ":"勇者","リュウガ":"賢者","タカノリ":"戦士","レン":"魔法使い","ユウト":"商人","ヒカル":"僧侶","ミツキ":"遊び人"};
+let MY = localStorage.getItem("myName") || "";
+let selName = "";
+function buildPick() {
+  const g = document.getElementById("pickGrid"); g.innerHTML = "";
+  for (const n of NAMES) {
+    const d = document.createElement("div");
+    d.className = "pk" + (n === selName ? " sel" : "");
+    d.innerHTML = '<img src="' + SPRITES[n] + '"><div class="n">' + n + '</div><div class="c">' + CLASSMAP[n] + '</div>';
+    d.onclick = () => selectPick(n);
+    g.appendChild(d);
+  }
+}
+function charField(cg, labelPrefix, name) {
+  let order = null;
+  for (const r of cg) {
+    if (r[0] === "項目") order = r.slice(1);
+    else if (order && String(r[0]).indexOf(labelPrefix) === 0) {
+      const i = order.indexOf(name);
+      return i >= 0 ? String(r[1 + i] || "") : "";
+    }
+  }
+  return "";
+}
+function prefill(n) {
+  if (!window.CGRID) return;
+  const cg = window.CGRID;
+  document.getElementById("cAlias").value = charField(cg, "二つ名", n);
+  document.getElementById("cSkill").value = charField(cg, "特技", n);
+  document.getElementById("cWeak").value  = charField(cg, "弱点", n);
+  document.getElementById("cHobby").value = charField(cg, "趣味", n);
+  document.getElementById("cVow").value   = charField(cg, "意気込み", n);
+  document.getElementById("cMenu").value  = charField(cg, "丸亀製麺", n);
+}
+function selectPick(n) {
+  selName = n; buildPick();
+  document.getElementById("createForm").style.display = "";
+  document.getElementById("cfTitle").textContent = n + "（" + CLASSMAP[n] + "）のキャラクター";
+  prefill(n);
+  if (localStorage.getItem("aikotoba")) document.getElementById("cAikoRow").style.display = "none";
+}
+async function charSave() {
+  const msg = document.getElementById("cMsg");
+  msg.className = "msg";
+  const alias = document.getElementById("cAlias").value.trim();
+  if (!selName) { msg.className = "err"; msg.textContent = "まず じぶんのすがたを えらんでくれ"; return; }
+  if (!alias) { msg.className = "err"; msg.textContent = "二つ名を なのってくれ（必須はこれだけ）"; return; }
+  const stored = localStorage.getItem("aikotoba") || "";
+  const typed = document.getElementById("cAiko").value.trim();
+  const aikotoba = typed || stored;
+  if (!aikotoba) { msg.className = "err"; msg.textContent = "あいことばを（Classroomの投稿にある）"; return; }
+  const btn = document.getElementById("cGo");
+  btn.disabled = true; msg.textContent = "ギルドの台帳に きざんでいる…";
+  try {
+    const r = await fetch(GAS_EXEC, { method: "POST",
+      body: JSON.stringify({ mode: "charsave", guest: aikotoba, name: selName, alias: alias,
+        skill: document.getElementById("cSkill").value, weak: document.getElementById("cWeak").value,
+        hobby: document.getElementById("cHobby").value, vow: document.getElementById("cVow").value,
+        menu: document.getElementById("cMenu").value }) });
+    const j = await r.json();
+    if (j.ok) {
+      localStorage.setItem("aikotoba", aikotoba);
+      localStorage.setItem("myName", selName); MY = selName;
+      msg.textContent = "🎉 登録完了——ようこそ、" + alias + "。";
+      setTimeout(enterMain, 900);
+    } else if (j.error === "aikotoba") {
+      localStorage.removeItem("aikotoba");
+      document.getElementById("cAikoRow").style.display = "";
+      msg.className = "err"; msg.textContent = "あいことばが ちがうようだ";
+    } else {
+      msg.className = "err"; msg.textContent = "台帳に きざめなかった（" + (j.error || "?") + "）";
+    }
+  } catch (e) {
+    msg.textContent = "きざんだ……はずだ（確認はできなかった。盤面のキャラクタータブを見てくれ）";
+    localStorage.setItem("myName", selName); MY = selName;
+    setTimeout(enterMain, 1500);
+  }
+  btn.disabled = false;
+}
+function applyMy() {
+  if (MY && NAMES.includes(MY))
+    document.getElementById("hsub").textContent = "ようこそ、" + MY + " のぼうけんへ ― きょうの一歩は、ここから。";
+}
+function enterMain() {
+  document.getElementById("createScreen").style.display = "none";
+  document.getElementById("mainScreen").style.display = "";
+  applyMy(); loadAll();
+}
+function reopenCreate() {
+  document.getElementById("mainScreen").style.display = "none";
+  document.getElementById("createScreen").style.display = "";
+  if (MY && NAMES.includes(MY)) selectPick(MY); else buildPick();
+}
+document.getElementById("skipCreate").onclick = function () {
+  localStorage.setItem("myName", "見学"); MY = "見学"; enterMain(); return false;
+};
+if (!MY) {
+  document.getElementById("mainScreen").style.display = "none";
+  document.getElementById("createScreen").style.display = "";
+  buildPick();
+} else { applyMy(); }
 
 /* ---------- 道しるべ層 ---------- */
 const DAYS = [
@@ -416,14 +556,17 @@ async function loadAll() {
       if (r[0] === "項目") order = r.slice(1);
       if (order && String(r[0]).startsWith("二つ名")) r.slice(1).forEach((v,i) => { if (order[i]) alias[order[i]] = v; });
     }
+    if (cg) { window.CGRID = cg;
+      if (document.getElementById("createScreen").style.display !== "none" && selName) prefill(selName); }
     const topxp = Math.max(1, ...NAMES.map(n => (members[n]||{}).xp || 0));
     const pt = document.getElementById("party"); pt.innerHTML = "";
     for (const n of NAMES) {
       const m = members[n] || {}, v = vit[n] || {hp:100, mpmax:30, mp:30, cond:""};
       const down = v.hp <= 0;
       pt.innerHTML +=
-        '<div class="card"><img src="' + SPRITES[n] + '" alt="' + n + '"><div class="body">' +
-        '<div class="nm">' + n + (alias[n] ? '　<span class="alias">「' + esc(alias[n]) + '」</span>' : "") + '</div>' +
+        '<div class="card' + (n === MY ? ' mine' : '') + '"><img src="' + SPRITES[n] + '" alt="' + n + '"><div class="body">' +
+        '<div class="nm">' + n + (n === MY ? '<span class="youbadge">あなた</span>' : '') +
+        (alias[n] ? '　<span class="alias">「' + esc(alias[n]) + '」</span>' : "") + '</div>' +
         '<div class="meta">' + (m.cls||"") + '　Lv' + (m.lv||"1") + '・' + (m.title||"") +
         '　｜　XP ' + (m.xp||0) + '（' + (m.rank||"-") + '位）' +
         (down ? '　<span class="down">✖ 戦闘不能</span>' : "") + '</div>' +

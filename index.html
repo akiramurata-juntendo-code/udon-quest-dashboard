@@ -259,6 +259,11 @@
     </div>
   </div>
 
+  <div class="win" id="codexWin">
+    <h2>📜 古文書の間</h2>
+    <div id="codexBody"></div>
+  </div>
+
   <div class="win">
     <h2>🍶 酒場「まるがま亭」― 盤面でゆいいつ、XPが発生しない止まり木</h2>
     <div class="sub">無口なマスターは<b>昼13時ごろ</b>と<b>夜22時ごろ</b>に店に来て、たまった注文と相談にまとめて返事を書く。即レスを期待するな——酒場とはそういう場所だ。店の掟は盤面の酒場タブの張り紙にある。</div>
@@ -317,10 +322,11 @@
 
 <script>
 const FEEDS = {
-  party:  "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6vpQtwW9KeWYByDA1ZW1rHd5tUJ3DU28V1tvs9BBdcL2wtMV5UlxfVSZSqrUXK0-4l0OfDO2SaCS2/pub?gid=1831779476&single=true&output=csv",
-  battle: "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6vpQtwW9KeWYByDA1ZW1rHd5tUJ3DU28V1tvs9BBdcL2wtMV5UlxfVSZSqrUXK0-4l0OfDO2SaCS2/pub?gid=984815449&single=true&output=csv",
-  chara:  "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6vpQtwW9KeWYByDA1ZW1rHd5tUJ3DU28V1tvs9BBdcL2wtMV5UlxfVSZSqrUXK0-4l0OfDO2SaCS2/pub?gid=1761778379&single=true&output=csv",
-  bar:    "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6vpQtwW9KeWYByDA1ZW1rHd5tUJ3DU28V1tvs9BBdcL2wtMV5UlxfVSZSqrUXK0-4l0OfDO2SaCS2/pub?gid=1025282135&single=true&output=csv"
+  party:   "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6vpQtwW9KeWYByDA1ZW1rHd5tUJ3DU28V1tvs9BBdcL2wtMV5UlxfVSZSqrUXK0-4l0OfDO2SaCS2/pub?gid=1831779476&single=true&output=csv",
+  battle:  "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6vpQtwW9KeWYByDA1ZW1rHd5tUJ3DU28V1tvs9BBdcL2wtMV5UlxfVSZSqrUXK0-4l0OfDO2SaCS2/pub?gid=984815449&single=true&output=csv",
+  chara:   "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6vpQtwW9KeWYByDA1ZW1rHd5tUJ3DU28V1tvs9BBdcL2wtMV5UlxfVSZSqrUXK0-4l0OfDO2SaCS2/pub?gid=1761778379&single=true&output=csv",
+  bar:     "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6vpQtwW9KeWYByDA1ZW1rHd5tUJ3DU28V1tvs9BBdcL2wtMV5UlxfVSZSqrUXK0-4l0OfDO2SaCS2/pub?gid=1025282135&single=true&output=csv",
+  reports: "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6vpQtwW9KeWYByDA1ZW1rHd5tUJ3DU28V1tvs9BBdcL2wtMV5UlxfVSZSqrUXK0-4l0OfDO2SaCS2/pub?gid=806804526&single=true&output=csv"
 };
 const GAS_EXEC = "https://script.google.com/macros/s/AKfycbx7V0c1pQaoFIsfHqTVojCpimsek_kPqH5Wuk1bQDHmG49j-SCPF0QmNO9PWyVVGsun/exec";
 
@@ -858,7 +864,58 @@ function updateBattleStat() {
                        (v.hp <= 0 ? "　✖ 戦闘不能（三行亭で回復）" : "")
                      : "ステータスを よみこみちゅう…";
 }
-renderMonGrid(); updateBattleStat();
+renderMonGrid(); updateBattleStat(); renderCodex(null);
+
+/* ---------- 古文書の間 ---------- */
+function codexUnlocked() {
+  const n3 = jstNow();
+  return ((n3.getMonth() + 1) * 100 + n3.getDate() >= 824) || location.search.indexOf("codexpreview") >= 0;
+}
+function codexDaysLeft() {
+  const t = new Date("2026-08-24T00:00:00+09:00") - new Date();
+  return Math.max(1, Math.ceil(t / 86400000));
+}
+function renderCodex(grid) {
+  const el = document.getElementById("codexBody");
+  if (!codexUnlocked()) {
+    el.innerHTML = '<div class="arenaTop"><img src="' + SCENEIMG["codex"] + '" style="height:96px;border:2px solid #fff;border-radius:10px;filter:brightness(.55)">' +
+      '<div><div class="quest">🔒 封印されし古文書</div>' +
+      '<div class="sub" style="margin-top:4px">セージが編む企画書の頁は、いまは封印の下にある。<b style="color:var(--gold)">8月24日、封印が解ける</b>——開封まで あと' + codexDaysLeft() + '日。<br>' +
+      'それまでに「王国への報告」の頁を積め。セージの筆は、諸君の報告だけで動く。</div></div></div>';
+    return;
+  }
+  if (!grid) {
+    el.innerHTML = '<div class="sub">頁の目録を ひらいている…（すこし待って さいよみこみ）</div>';
+    return;
+  }
+  let hi = grid.findIndex(r => r[0] === "ID");
+  let total = 0, filled = 0;
+  const own = {};
+  if (hi >= 0) for (let i = hi + 1; i < grid.length; i++) {
+    const r = grid[i];
+    const id = String(r[0] || "").trim();
+    if (!id || id.indexOf("KAI") === 0) continue;
+    total++;
+    const owner = String(r[1] || "").trim() || "？";
+    if (!own[owner]) own[owner] = { f: 0, t: 0 };
+    own[owner].t++;
+    if (String(r[6] || "").trim() !== "") { filled++; own[owner].f++; }
+  }
+  const bar31 = "▓".repeat(filled) + "░".repeat(Math.max(0, total - filled));
+  let chips = "";
+  const order = ["全員"].concat(NAMES);
+  for (const o of order) if (own[o]) {
+    const c = own[o], done = c.f >= c.t && c.t > 0;
+    chips += '<span style="display:inline-block;border:2px solid ' + (done ? "var(--gold)" : "#555") + ';border-radius:8px;padding:2px 8px;margin:3px 4px 0 0;font-size:12px;color:' + (done ? "var(--gold)" : "var(--dim)") + '">' +
+             (o === "全員" ? "みんなの頁" : o) + "　" + c.f + "／" + c.t + "</span>";
+  }
+  el.innerHTML =
+    '<div class="quest">古文書 <span style="color:var(--gold);font-size:22px">' + filled + '</span> ／ ' + total + ' 頁に灯が入った' +
+    (filled >= total && total > 0 ? '　<span class="here">全頁点灯！</span>' : '') + '</div>' +
+    '<div class="teambar" style="font-size:13px;letter-spacing:2px;margin:6px 0">' + bar31 + '</div>' +
+    '<div class="sub">失われた頁 あと ' + Math.max(0, total - filled) + '。8/25の夜、セージが ver.1 を編む——空白の頁は「失われた頁」として白紙のまま世に出る。頁に灯を入れるのは、盤面「王国への報告」の報告本文だ。</div>' +
+    '<div style="margin-top:6px">' + chips + '</div>';
+}
 
 /* ---------- 盤面データ ---------- */
 function parseCSV(text) {
@@ -890,16 +947,20 @@ async function loadAll() {
   const st = document.getElementById("status");
   st.textContent = "よみこみちゅう…"; st.className = "msg";
   const barReady = FEEDS.bar.indexOf("PASTE_") !== 0;
+  const repReady = FEEDS.reports.indexOf("PASTE_") !== 0 && codexUnlocked();
   try {
     const jobs = [getGrid(FEEDS.party), getGrid(FEEDS.battle), getGrid(FEEDS.chara),
-                  barReady ? getGrid(FEEDS.bar) : Promise.reject(new Error("未接続"))];
+                  barReady ? getGrid(FEEDS.bar) : Promise.reject(new Error("未接続")),
+                  repReady ? getGrid(FEEDS.reports) : Promise.reject(new Error("封印中"))];
     const res = await Promise.allSettled(jobs);
     const pg = res[0].status === "fulfilled" ? res[0].value : null;
     const bg = res[1].status === "fulfilled" ? res[1].value : null;
     const cg = res[2].status === "fulfilled" ? res[2].value : null;
     const brg = res[3].status === "fulfilled" ? res[3].value : null;
+    const rpg = res[4].status === "fulfilled" ? res[4].value : null;
     if (!pg && !bg && !cg) throw new Error("全フィード失敗");
     renderBar(brg);
+    renderCodex(rpg);
 
     const members = {};
     if (pg) for (const r of pg) {
@@ -950,6 +1011,7 @@ async function loadAll() {
     }
     const labels = ["パーティー","バトル","キャラクター"].filter((_, i) => res[i].status !== "fulfilled");
     if (barReady && res[3].status !== "fulfilled") labels.push("酒場");
+    if (repReady && res[4].status !== "fulfilled") labels.push("古文書");
     st.textContent = labels.length
       ? "いちぶ よみこめず（" + labels.join("・") + "）― すこし まって ▶さいよみこみ"
       : "さいごのこうしん " + new Date().toLocaleTimeString("ja-JP");

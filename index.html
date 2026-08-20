@@ -75,6 +75,14 @@
   .shake { animation: shake .5s; }
   .winflash { color:var(--gold); }
   .losetext { color:#ff9b9b; }
+  .recgrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(290px, 1fr)); gap:14px; margin-top:8px; }
+  .recbox { border:2px solid #444; border-radius:10px; padding:10px 12px; background:#0c0c30; }
+  .recbox h3 { font-size:14px; color:var(--gold); margin:0 0 6px; }
+  .recbox label { font-size:12px; color:var(--dim); display:block; margin:8px 0 2px; }
+  .recbox input, .recbox textarea, .recbox select {
+    width:100%; background:#101034; color:#fff; border:2px solid #fff; border-radius:6px;
+    font-family:inherit; font-size:14px; padding:6px 8px; }
+  .recbox textarea { min-height:56px; }
 
   .barlog { max-height:340px; overflow-y:auto; border:2px solid #444; border-radius:8px; padding:8px 10px;
             background:#07071c; margin:8px 0; }
@@ -221,8 +229,34 @@
         <span class="msg" id="amsg"></span></div>
       <div class="msgwin" id="ares" style="display:none"></div>
       <button class="cmd gold" id="abackBtn" style="display:none" onclick="battleReset()">▶ 闘技場に もどる</button>
+      <button class="cmd" id="aInnBtn" style="display:none"
+        onclick="document.getElementById('innWin').scrollIntoView({behavior:'smooth'})">🏨 三行亭で休む</button>
     </div>
     <div class="msg" id="bidleMsg"></div>
+  </div>
+
+  <div class="win" id="innWin">
+    <h2>🏨 回復のやかた ― 三行亭と、呪文書の祭壇</h2>
+    <div class="sub">この王国の回復薬は「振り返り」でできている。宿で3行書けばHP全回復（+10XP）。効いたプロンプトを祭壇に奉納すればMP+10（+15XP）。書いた中身は、そのまま盤面の日誌と呪文書に刻まれる。</div>
+    <div class="recgrid">
+      <div class="recbox">
+        <h3>🏨 三行亭にとまる（HP全回復・1日1泊）</h3>
+        <label>Q1 今日、自分が「決めた」こと</label><input id="inQ1" maxlength="120">
+        <label>Q2 今日、AIに任せず自分でやったこと</label><input id="inQ2" maxlength="120">
+        <label>Q3 明日、いちばん怖いこと</label><input id="inQ3" maxlength="120">
+        <div class="frow" style="margin-top:8px"><button class="cmd gold" onclick="innRest()">▶ とまる</button>
+          <span class="msg" id="innMsg"></span></div>
+      </div>
+      <div class="recbox">
+        <h3>🪄 祭壇に奉納する（MP+10）</h3>
+        <label>場面（何をしたかった）</label><input id="spScene" maxlength="60">
+        <label>使ったAI</label><select id="spAI"><option>Gemini</option><option>NotebookLM</option><option>ChatGPT</option><option>Claude</option><option>その他</option></select>
+        <label>プロンプト（そのまま貼る）</label><textarea id="spSpell" maxlength="500"></textarea>
+        <label>結果と一言</label><input id="spResult" maxlength="120">
+        <div class="frow" style="margin-top:8px"><button class="cmd gold" onclick="spellSave()">▶ 奉納する</button>
+          <span class="msg" id="spMsg"></span></div>
+      </div>
+    </div>
   </div>
 
   <div class="win">
@@ -739,6 +773,7 @@ async function battleAnswer(k) {
   ["A", "B", "C", "D"].forEach(x => { const b = document.getElementById("cho" + x); if (b) b.disabled = true; });
   const ares = document.getElementById("ares");
   ares.style.display = ""; ares.className = "msgwin"; ares.textContent = "……！";
+  let wasDown = false;
   try {
     const j = await battlePost({ act: "answer", ans: k });
     if (j.ok && j.win) {
@@ -746,6 +781,7 @@ async function battleAnswer(k) {
       ares.textContent = "🎉 " + BSTATE.mon.n + "を たおした！　+" + j.xp + " XP！\n\n【解説】" + j.exp;
       document.getElementById("amon").style.opacity = ".15";
     } else if (j.ok) {
+      wasDown = !!j.down;
       document.getElementById("arena").classList.add("shake");
       setTimeout(() => document.getElementById("arena").classList.remove("shake"), 600);
       ares.className = "msgwin losetext";
@@ -755,13 +791,63 @@ async function battleAnswer(k) {
     } else ares.textContent = "判定に しっぱいした（" + (j.error || "?") + "）——盤面のバトルタブから続きができる。";
   } catch (e) { ares.textContent = "つうしんに しっぱいした——盤面のバトルタブに戦いは残っている。そこから回答してくれ。"; }
   document.getElementById("abackBtn").style.display = "";
+  if (wasDown) document.getElementById("aInnBtn").style.display = "";
   BSTATE.row = 0; BSTATE.busy = false;
   loadAll();
 }
 function battleReset() {
   document.getElementById("arena").style.display = "none";
   document.getElementById("monGrid").style.display = "";
+  document.getElementById("aInnBtn").style.display = "none";
   renderMonGrid(); setIdleMsg("");
+}
+async function innRest() {
+  const msg = document.getElementById("innMsg");
+  msg.className = "msg";
+  if (!(MY && (NAMES.includes(MY) || MY === "賢王"))) { msg.className = "err"; msg.textContent = "まず登録の間で名を名のってくれ。"; return; }
+  if (!localStorage.getItem("aikotoba")) { msg.className = "err"; msg.textContent = "あいことばを一度通してからだ。"; return; }
+  const q1 = document.getElementById("inQ1").value.trim(),
+        q2 = document.getElementById("inQ2").value.trim(),
+        q3 = document.getElementById("inQ3").value.trim();
+  if (!q1 || !q2 || !q3) { msg.className = "err"; msg.textContent = "3行そろって、はじめて宿代になる。"; return; }
+  msg.textContent = "ふとんを しいている…";
+  try {
+    const r = await fetch(GAS_EXEC, { method: "POST", body: JSON.stringify({
+      mode: "innrest", guest: localStorage.getItem("aikotoba"), name: MY, q1: q1, q2: q2, q3: q3 }) });
+    const j = await r.json();
+    if (j.ok) {
+      msg.textContent = "ぐっすり眠った——HP全回復！ おかみが まかないうどんを出してくれた 🍜（+10XP）";
+      document.getElementById("inQ1").value = ""; document.getElementById("inQ2").value = ""; document.getElementById("inQ3").value = "";
+      if (window.VIT && window.VIT[MY]) { window.VIT[MY].hp = 100; updateBattleStat(); }
+      loadAll();
+    } else if (j.error === "rested") msg.textContent = "今日はもう泊まった。連泊はできない——また明日、3行持っておいで。";
+    else if (j.error === "aikotoba") { localStorage.removeItem("aikotoba"); msg.className = "err"; msg.textContent = "あいことばが ちがうようだ。"; }
+    else { msg.className = "err"; msg.textContent = "宿帳に書けなかった（" + (j.error || "?") + "）"; }
+  } catch (e) { msg.textContent = "つうしんに しっぱいした——盤面の冒険日誌からでも泊まれる。"; }
+}
+async function spellSave() {
+  const msg = document.getElementById("spMsg");
+  msg.className = "msg";
+  if (!(MY && (NAMES.includes(MY) || MY === "賢王"))) { msg.className = "err"; msg.textContent = "まず登録の間で名を名のってくれ。"; return; }
+  if (!localStorage.getItem("aikotoba")) { msg.className = "err"; msg.textContent = "あいことばを一度通してからだ。"; return; }
+  const scene = document.getElementById("spScene").value.trim(),
+        spell = document.getElementById("spSpell").value.trim();
+  if (!scene || !spell) { msg.className = "err"; msg.textContent = "「場面」と「プロンプト」は祭壇のならわしだ。"; return; }
+  msg.textContent = "祭壇に ささげている…";
+  try {
+    const r = await fetch(GAS_EXEC, { method: "POST", body: JSON.stringify({
+      mode: "spellsave", guest: localStorage.getItem("aikotoba"), name: MY,
+      scene: scene, ai: document.getElementById("spAI").value,
+      spell: spell, result: document.getElementById("spResult").value }) });
+    const j = await r.json();
+    if (j.ok) {
+      msg.textContent = "祭壇が光る……マナが満ちた！ MP+10（いま " + j.mp + "・+15XP）";
+      document.getElementById("spScene").value = ""; document.getElementById("spSpell").value = ""; document.getElementById("spResult").value = "";
+      if (window.VIT && window.VIT[MY]) { window.VIT[MY].mp = j.mp; updateBattleStat(); }
+      loadAll();
+    } else if (j.error === "aikotoba") { localStorage.removeItem("aikotoba"); msg.className = "err"; msg.textContent = "あいことばが ちがうようだ。"; }
+    else { msg.className = "err"; msg.textContent = "奉納できなかった（" + (j.error || "?") + "）"; }
+  } catch (e) { msg.textContent = "つうしんに しっぱいした——盤面の呪文書からでも奉納できる。"; }
 }
 function updateBattleStat() {
   const el = document.getElementById("bvstat");

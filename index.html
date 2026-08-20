@@ -52,6 +52,21 @@
   .stop.today { border-color:var(--gold); color:#fff; box-shadow:0 0 10px #ffd75e66; transform:scale(1.06); }
   .stop.today .dd { color:var(--gold); }
 
+  .barlog { max-height:340px; overflow-y:auto; border:2px solid #444; border-radius:8px; padding:8px 10px;
+            background:#07071c; margin:8px 0; }
+  .bub { margin:10px 0; }
+  .bub .who { color:var(--gold); font-size:12px; margin-bottom:2px; }
+  .bub .txt { background:#101034; border:2px solid #333; border-radius:8px; padding:6px 10px; font-size:14px;
+              white-space:pre-wrap; word-break:break-word; }
+  .bub.master { margin-left:18px; }
+  .bub.master .who { color:#7fdc9a; }
+  .bub.master .txt { border-color:#2c5c3f; background:#0c2418; }
+  .barform select, .barform textarea, .barform input {
+    background:#0c0c30; color:#fff; border:2px solid #fff; border-radius:6px;
+    font-family:inherit; font-size:14px; padding:6px 8px; }
+  .barform textarea { width:100%; min-height:64px; margin:6px 0; }
+  .frow { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:4px 0; }
+
   .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:12px; }
   .card { background:var(--win); border:3px solid #fff; border-radius:10px; padding:10px 12px; display:flex; gap:12px;
           box-shadow: 4px 5px 0 rgba(0,0,0,.5); }
@@ -75,6 +90,7 @@
          font-family:inherit; font-size:14px; padding:7px 16px; cursor:pointer; margin:4px 10px 4px 0; text-decoration:none; }
   .cmd:active { transform:translateY(2px); }
   .cmd.gold { border-color:var(--gold); color:var(--gold); }
+  .cmd:disabled { opacity:.5; }
   .msg { font-size:13px; color:var(--dim); }
   .err { color:#ff6b6b; font-size:14px; }
   .slime { image-rendering:pixelated; height:44px; vertical-align:middle; margin-right:8px; border-radius:6px; }
@@ -88,7 +104,7 @@
     <div class="toprow">
       <div>
         <h1>⚔ マルガメア王国ダッシュボード</h1>
-        <div class="sub">TORIDOLL QUEST ― みるだけでOK。きょうの一歩は、ここからはじまる。</div>
+        <div class="sub">TORIDOLL QUEST ― きょうの一歩は、ここからはじまる。</div>
       </div>
       <img class="dragon" id="dragon" alt="カマアゲドラゴン">
     </div>
@@ -120,13 +136,32 @@
       🧭 <b>こまったら</b>：
       なにをすればいいか わからない → 盤面の<b>じぶんの行</b>と、この画面の<b>きょうのすすめかた</b>／
       30分つまった → 状態を「<b>SOS</b>」に（+10XP。かくすことが唯一の反則）／
-      つかれた → 「<b>酒場</b>」タブへ（マスターは昼13時と夜22時に店に出る）
+      つかれた → した↓の<b>酒場</b>へ
     </div>
   </div>
 
   <div class="win">
     <h2>🗺 冒険のちず（8/20 → 8/31 封印の門）</h2>
     <div class="map" id="map"></div>
+  </div>
+
+  <div class="win">
+    <h2>🍶 酒場「まるがま亭」― 盤面でゆいいつ、XPが発生しない止まり木</h2>
+    <div class="sub">無口なマスターは<b>昼13時ごろ</b>と<b>夜22時ごろ</b>に店に来て、たまった注文と相談にまとめて返事を書く。即レスを期待するな——酒場とはそういう場所だ。店の掟は盤面の酒場タブの張り紙にある。</div>
+    <div class="barlog" id="barlog"><div class="sub">とびらを あけている…</div></div>
+    <div class="barform">
+      <div class="frow">
+        <select id="bname">
+          <option value="">なまえ…</option>
+          <option>ケイタ</option><option>リュウガ</option><option>タカノリ</option><option>レン</option>
+          <option>ユウト</option><option>ヒカル</option><option>ミツキ</option><option>賢王</option>
+        </select>
+        <select id="bkind"><option>注文</option><option>相談</option><option>雑談</option></select>
+      </div>
+      <textarea id="btext" maxlength="300" placeholder="マスター、ひとつ聞いてくれ——（300字まで）"></textarea>
+      <div class="frow" id="aikotobarow"><input id="baikotoba" size="24" placeholder="あいことば（Classroomの投稿にある）"></div>
+      <div class="frow"><button class="cmd gold" id="bsend" onclick="barPost()">▶ カウンターにおく</button><span class="msg" id="bmsg"></span></div>
+    </div>
   </div>
 
   <div class="win">
@@ -155,15 +190,17 @@
     <span class="msg" id="status">よみこみちゅう…</span>
   </div>
 
-  <footer>マルガメア王国 御用達 ― データは盤面より自動転写（5分ごと更新）／そうさ（クエスト・バトル・酒場）は盤面で</footer>
+  <footer>マルガメア王国 御用達 ― データは盤面より自動転写（5分ごと更新）／クエスト・バトルのそうさは盤面で</footer>
 </div>
 
 <script>
 const FEEDS = {
   party:  "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6vpQtwW9KeWYByDA1ZW1rHd5tUJ3DU28V1tvs9BBdcL2wtMV5UlxfVSZSqrUXK0-4l0OfDO2SaCS2/pub?gid=1831779476&single=true&output=csv",
   battle: "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6vpQtwW9KeWYByDA1ZW1rHd5tUJ3DU28V1tvs9BBdcL2wtMV5UlxfVSZSqrUXK0-4l0OfDO2SaCS2/pub?gid=984815449&single=true&output=csv",
-  chara:  "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6vpQtwW9KeWYByDA1ZW1rHd5tUJ3DU28V1tvs9BBdcL2wtMV5UlxfVSZSqrUXK0-4l0OfDO2SaCS2/pub?gid=1761778379&single=true&output=csv"
+  chara:  "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6vpQtwW9KeWYByDA1ZW1rHd5tUJ3DU28V1tvs9BBdcL2wtMV5UlxfVSZSqrUXK0-4l0OfDO2SaCS2/pub?gid=1761778379&single=true&output=csv",
+  bar:    "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6vpQtwW9KeWYByDA1ZW1rHd5tUJ3DU28V1tvs9BBdcL2wtMV5UlxfVSZSqrUXK0-4l0OfDO2SaCS2/pub?gid=1025282135&single=true&output=csv"
 };
+const GAS_EXEC = "https://script.google.com/macros/s/AKfycbx7V0c1pQaoFIsfHqTVojCpimsek_kPqH5Wuk1bQDHmG49j-SCPF0QmNO9PWyVVGsun/exec";
 
 const NAMES = ["ケイタ","リュウガ","タカノリ","レン","ユウト","ヒカル","ミツキ"];
 const SPRITES = {
@@ -245,6 +282,72 @@ function renderChk() {
 renderChk();
 if (!localStorage.getItem("visited")) { document.getElementById("firstguide").open = true; localStorage.setItem("visited", "1"); }
 
+/* ---------- 酒場 ---------- */
+function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+function renderBar(grid) {
+  const el = document.getElementById("barlog");
+  if (!grid) { el.innerHTML = '<div class="sub">酒場のとびらは じゅんびちゅう（すこし まって さいよみこみ）</div>'; return; }
+  let hi = grid.findIndex(r => r[0] === "日時");
+  const items = [];
+  if (hi >= 0) for (let i = hi + 1; i < grid.length; i++) {
+    const r = grid[i];
+    if (!r || String(r[3] || "").trim() === "") continue;
+    if (String(r[1] || "").indexOf("（例）") >= 0) continue;
+    items.push({ time: r[0], name: r[1], kind: r[2], post: r[3], reply: r[4], rat: r[5] });
+  }
+  const last = items.slice(-12);
+  if (!last.length) { el.innerHTML = '<div class="sub">まだ だれも来ていない。いちばんのりだ——下のカウンターからどうぞ。</div>'; return; }
+  el.innerHTML = "";
+  for (const it of last) {
+    el.innerHTML += '<div class="bub"><div class="who">' + esc(it.name) + '（' + esc(it.kind || "…") + '）　' + esc(it.time || "") + '</div>' +
+                    '<div class="txt">' + esc(it.post) + '</div></div>';
+    if (String(it.reply || "").trim() !== "")
+      el.innerHTML += '<div class="bub master"><div class="who">🍶 マスター　' + esc(it.rat || "") + '</div>' +
+                      '<div class="txt">' + esc(it.reply) + '</div></div>';
+  }
+  el.scrollTop = el.scrollHeight;
+}
+async function barPost() {
+  const name = document.getElementById("bname").value;
+  const kind = document.getElementById("bkind").value;
+  const text = document.getElementById("btext").value.trim();
+  const msg = document.getElementById("bmsg");
+  const stored = localStorage.getItem("aikotoba") || "";
+  const typed = document.getElementById("baikotoba").value.trim();
+  const aikotoba = typed || stored;
+  msg.className = "msg";
+  if (!name) { msg.className = "err"; msg.textContent = "なまえを えらんでくれ"; return; }
+  if (!text) { msg.className = "err"; msg.textContent = "ことばが からっぽだ"; return; }
+  if (!aikotoba) { msg.className = "err"; msg.textContent = "あいことばを（Classroomの投稿にある）"; return; }
+  const btn = document.getElementById("bsend");
+  btn.disabled = true; msg.textContent = "カウンターにはこんでいる…";
+  try {
+    const r = await fetch(GAS_EXEC, { method: "POST",
+      body: JSON.stringify({ mode: "barpost", guest: aikotoba, name: name, kind: kind, text: text }) });
+    const j = await r.json();
+    if (j.ok) {
+      localStorage.setItem("aikotoba", aikotoba);
+      document.getElementById("aikotobarow").style.display = "none";
+      const el = document.getElementById("barlog");
+      el.innerHTML += '<div class="bub"><div class="who">' + esc(name) + '（' + esc(kind) + '）　たったいま</div>' +
+                      '<div class="txt">' + esc(text) + '</div></div>';
+      el.scrollTop = el.scrollHeight;
+      document.getElementById("btext").value = "";
+      msg.textContent = "カウンターにおいた。マスターの返事は、昼か夜だ。";
+    } else if (j.error === "aikotoba") {
+      localStorage.removeItem("aikotoba");
+      document.getElementById("aikotobarow").style.display = "";
+      msg.className = "err"; msg.textContent = "あいことばが ちがうようだ";
+    } else {
+      msg.className = "err"; msg.textContent = "うまく おけなかった（" + (j.error || "?") + "）";
+    }
+  } catch (e) {
+    msg.textContent = "とどけた……はずだ（返事の確認はできなかった。数分後に帳場を見てくれ）";
+  }
+  btn.disabled = false;
+}
+if (localStorage.getItem("aikotoba")) document.getElementById("aikotobarow").style.display = "none";
+
 /* ---------- 盤面データ ---------- */
 function parseCSV(text) {
   const rows = []; let row = [], cur = "", inq = false;
@@ -274,12 +377,17 @@ function bar(pct, color, label, text) {
 async function loadAll() {
   const st = document.getElementById("status");
   st.textContent = "よみこみちゅう…"; st.className = "msg";
+  const barReady = FEEDS.bar.indexOf("PASTE_") !== 0;
   try {
-    const res = await Promise.allSettled([getGrid(FEEDS.party), getGrid(FEEDS.battle), getGrid(FEEDS.chara)]);
+    const jobs = [getGrid(FEEDS.party), getGrid(FEEDS.battle), getGrid(FEEDS.chara),
+                  barReady ? getGrid(FEEDS.bar) : Promise.reject(new Error("未接続"))];
+    const res = await Promise.allSettled(jobs);
     const pg = res[0].status === "fulfilled" ? res[0].value : null;
     const bg = res[1].status === "fulfilled" ? res[1].value : null;
     const cg = res[2].status === "fulfilled" ? res[2].value : null;
+    const brg = res[3].status === "fulfilled" ? res[3].value : null;
     if (!pg && !bg && !cg) throw new Error("全フィード失敗");
+    renderBar(brg);
 
     const members = {};
     if (pg) for (const r of pg) {
@@ -315,7 +423,7 @@ async function loadAll() {
       const down = v.hp <= 0;
       pt.innerHTML +=
         '<div class="card"><img src="' + SPRITES[n] + '" alt="' + n + '"><div class="body">' +
-        '<div class="nm">' + n + (alias[n] ? '　<span class="alias">「' + alias[n] + '」</span>' : "") + '</div>' +
+        '<div class="nm">' + n + (alias[n] ? '　<span class="alias">「' + esc(alias[n]) + '」</span>' : "") + '</div>' +
         '<div class="meta">' + (m.cls||"") + '　Lv' + (m.lv||"1") + '・' + (m.title||"") +
         '　｜　XP ' + (m.xp||0) + '（' + (m.rank||"-") + '位）' +
         (down ? '　<span class="down">✖ 戦闘不能</span>' : "") + '</div>' +
@@ -324,9 +432,10 @@ async function loadAll() {
         bar((m.xp||0) / topxp * 100, "var(--xp)", "XP", String(m.xp||0)) +
         '</div></div>';
     }
-    const bad = ["パーティー","バトル","キャラクター"].filter((_, i) => res[i].status !== "fulfilled");
-    st.textContent = bad.length
-      ? "いちぶ よみこめず（" + bad.join("・") + "）― すこし まって ▶さいよみこみ"
+    const labels = ["パーティー","バトル","キャラクター"].filter((_, i) => res[i].status !== "fulfilled");
+    if (barReady && res[3].status !== "fulfilled") labels.push("酒場");
+    st.textContent = labels.length
+      ? "いちぶ よみこめず（" + labels.join("・") + "）― すこし まって ▶さいよみこみ"
       : "さいごのこうしん " + new Date().toLocaleTimeString("ja-JP");
   } catch (e) {
     st.textContent = "つうしんに しっぱいした！（" + e.message + "）― ▶さいよみこみ をおしてくれ";

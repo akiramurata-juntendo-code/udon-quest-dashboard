@@ -63,6 +63,18 @@
              max-width:min(92vw, 800px); font-size:14px; line-height:1.7; }
   .lb .cap .t { color:var(--gold); margin-bottom:2px; }
   .lb .x { color:var(--dim); font-size:11px; margin-top:4px; }
+  .msgwin { border:3px solid #fff; border-radius:10px; background:#000010; padding:10px 12px;
+            font-size:15px; line-height:1.8; margin:8px 0; min-height:44px; white-space:pre-wrap; }
+  .arenaTop { display:flex; gap:14px; align-items:center; margin:6px 0; }
+  .arenaTop img { image-rendering:pixelated; height:110px; border:2px solid #fff; border-radius:10px;
+                  background:#0c0c30; padding:4px; transition:opacity .8s; }
+  .choiceBtn { display:block; width:100%; text-align:left; margin:6px 0; }
+  .pk.locked { filter:grayscale(1); opacity:.55; }
+  .pk .meta2 { font-size:10.5px; color:var(--dim); }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(7px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(4px)} }
+  .shake { animation: shake .5s; }
+  .winflash { color:var(--gold); }
+  .losetext { color:#ff9b9b; }
 
   .barlog { max-height:340px; overflow-y:auto; border:2px solid #444; border-radius:8px; padding:8px 10px;
             background:#07071c; margin:8px 0; }
@@ -192,6 +204,25 @@
     <div class="sub">隊列は日ごとにすすむ。遅れても大丈夫——じぶんの行から追いつけばいい。土地をタップすると、その地のクエストがわかる。</div>
     <div class="fieldwrap"><svg id="fieldmap" viewBox="0 0 1000 430" xmlns="http://www.w3.org/2000/svg"></svg></div>
     <div class="mapcap" id="mapcap"></div>
+  </div>
+
+  <div class="win">
+    <h2>⚔ バトルの間 ― けいざいがくで、魔物とたたかえ（任意・1日1戦）</h2>
+    <div class="sub">まちがえても、正解と解説はもらえる——負けた戦いこそ学びが残る。深手が怖ければ、弱い魔物から。</div>
+    <div class="sub" id="bvstat" style="margin-top:4px"></div>
+    <div class="pick" id="monGrid" style="margin-top:8px"></div>
+    <div id="arena" style="display:none">
+      <div class="arenaTop"><img id="amon" alt="魔物"><div>
+        <div class="quest land" id="amonName"></div>
+        <div class="sub" id="amonInfo"></div></div></div>
+      <div class="msgwin" id="aq"></div>
+      <div id="achoices"></div>
+      <div class="frow"><button class="cmd" id="ahintBtn" onclick="battleHint()">🔮 ヒント（MP5・2択になる）</button>
+        <span class="msg" id="amsg"></span></div>
+      <div class="msgwin" id="ares" style="display:none"></div>
+      <button class="cmd gold" id="abackBtn" style="display:none" onclick="battleReset()">▶ 闘技場に もどる</button>
+    </div>
+    <div class="msg" id="bidleMsg"></div>
   </div>
 
   <div class="win">
@@ -602,6 +633,147 @@ async function barPost() {
 }
 if (localStorage.getItem("aikotoba")) document.getElementById("aikotobarow").style.display = "none";
 
+/* ---------- バトルの間 ---------- */
+const MONINFO = [
+  {n:"うどんスライム",   s:"slime",    lo:5,  hi:10, xp:15},
+  {n:"うどんゴースト",   s:"ghost",    lo:8,  hi:14, xp:15},
+  {n:"うどんがいこつ",   s:"skeleton", lo:10, hi:18, xp:20},
+  {n:"うどん魔導士",     s:"mage",     lo:12, hi:22, xp:20},
+  {n:"うどんキメラ",     s:"chimera",  lo:15, hi:26, xp:25},
+  {n:"うどん伯爵",       s:"count",    lo:18, hi:30, xp:25},
+  {n:"カマアゲドラゴン", s:"dragon",   lo:20, hi:35, xp:30}
+];
+const BSTATE = { row: 0, busy: false, mon: null };
+function dragonSealed() {
+  const n2 = jstNow(); return (n2.getMonth() + 1) * 100 + n2.getDate() < 829;
+}
+function renderMonGrid() {
+  const g = document.getElementById("monGrid"); g.innerHTML = "";
+  for (const m of MONINFO) {
+    const sealed = (m.n === "カマアゲドラゴン" && dragonSealed());
+    const d = document.createElement("div");
+    d.className = "pk" + (sealed ? " locked" : "");
+    d.innerHTML = '<img src="' + SPRITES[m.s] + '"><div class="n">' + m.n + '</div>' +
+      '<div class="meta2">' + (sealed ? "🔒 8/29 かいふう" : "こうげき" + m.lo + "-" + m.hi + "／XP" + m.xp) + '</div>';
+    d.onclick = () => sealed
+      ? setIdleMsg("竜は封印の門の前にいる。挑めるのは8月29日からだ。")
+      : battleStart(m);
+    g.appendChild(d);
+  }
+}
+function setIdleMsg(t) { document.getElementById("bidleMsg").textContent = t; }
+function typewrite(el, text) {
+  el.textContent = ""; let i = 0;
+  const tm = setInterval(() => { el.textContent += text[i++] || ""; if (i >= text.length) clearInterval(tm); }, 16);
+}
+async function battlePost(payload) {
+  payload.mode = "battle"; payload.guest = localStorage.getItem("aikotoba") || "";
+  payload.name = MY;
+  const r = await fetch(GAS_EXEC, { method: "POST", body: JSON.stringify(payload) });
+  return await r.json();
+}
+async function battleStart(m) {
+  setIdleMsg("");
+  if (!(MY && (NAMES.includes(MY) || MY === "賢王"))) {
+    setIdleMsg("まず「▶ キャラをなおす」から登録の間で名を名のれ——見学のままでは戦えない。"); return;
+  }
+  if (!localStorage.getItem("aikotoba")) {
+    setIdleMsg("あいことばが要る。登録の間か酒場で、一度あいことばを通してからだ。"); return;
+  }
+  if (BSTATE.busy) return;
+  BSTATE.busy = true; setIdleMsg(m.n + "が あらわれた……！");
+  try {
+    const j = await battlePost({ act: "start", monster: m.n });
+    if (j.ok) {
+      BSTATE.row = j.row; BSTATE.mon = m;
+      document.getElementById("monGrid").style.display = "none";
+      document.getElementById("arena").style.display = "";
+      document.getElementById("amon").src = SPRITES[m.s];
+      document.getElementById("amon").style.opacity = "1";
+      document.getElementById("amonName").textContent = m.n + " が あらわれた！";
+      document.getElementById("amonInfo").textContent =
+        "こうげき " + m.lo + "-" + m.hi + "／かちどき +" + m.xp + "XP　｜　じぶん：HP " + j.hp + "・MP " + j.mp + "　｜　出題【" + j.src + "】";
+      typewrite(document.getElementById("aq"), j.q);
+      const ch = document.getElementById("achoices"); ch.innerHTML = "";
+      ["A", "B", "C", "D"].forEach((k, idx) => {
+        const b = document.createElement("button");
+        b.className = "cmd choiceBtn"; b.id = "cho" + k;
+        b.textContent = k + "： " + j.choices[idx];
+        b.onclick = () => battleAnswer(k);
+        ch.appendChild(b);
+      });
+      document.getElementById("ares").style.display = "none";
+      document.getElementById("abackBtn").style.display = "none";
+      document.getElementById("ahintBtn").disabled = false;
+      document.getElementById("amsg").textContent = "";
+      setIdleMsg("");
+    } else if (j.error === "daily") setIdleMsg("今日はもう戦った。戦は一日一戦、麺は一日一杯だ。また明日。");
+    else if (j.error === "down") setIdleMsg("戦闘不能だ。三行亭（冒険日誌に3行）で休んでから来い。");
+    else if (j.error === "sealed") setIdleMsg("竜は封印の門の前にいる。挑めるのは8月29日からだ。");
+    else if (j.error === "aikotoba") { localStorage.removeItem("aikotoba"); setIdleMsg("あいことばが ちがうようだ。酒場かキャラ登録で入れなおしてくれ。"); }
+    else setIdleMsg("闘技場のとびらが あかない（" + (j.error || "?") + "）");
+  } catch (e) { setIdleMsg("つうしんに しっぱいした——すこし待って、もういちど。"); }
+  BSTATE.busy = false;
+}
+async function battleHint() {
+  if (!BSTATE.row || BSTATE.busy) return;
+  BSTATE.busy = true;
+  const msg = document.getElementById("amsg");
+  msg.textContent = "大将に 耳を かす……";
+  try {
+    const j = await battlePost({ act: "hint", row: BSTATE.row });
+    if (j.ok) {
+      msg.textContent = "耳打ち：答えは「" + j.hint + "」だ。（のこりMP " + j.mp + "）";
+      const keep = j.hint.match(/[A-D]/g) || [];
+      ["A", "B", "C", "D"].forEach(k => { if (keep.indexOf(k) < 0) document.getElementById("cho" + k).disabled = true; });
+      document.getElementById("ahintBtn").disabled = true;
+    } else if (j.error === "mp") msg.textContent = "MPが足りん。呪文書に奉納すれば +10 だ。";
+    else if (j.error === "hinted") msg.textContent = "耳打ちは 一戦に一度だけだ。";
+    else msg.textContent = "……いまは 耳を かせない（" + (j.error || "?") + "）";
+  } catch (e) { msg.textContent = "つうしんに しっぱいした。"; }
+  BSTATE.busy = false;
+}
+async function battleAnswer(k) {
+  if (!BSTATE.row || BSTATE.busy) return;
+  BSTATE.busy = true;
+  ["A", "B", "C", "D"].forEach(x => { const b = document.getElementById("cho" + x); if (b) b.disabled = true; });
+  const ares = document.getElementById("ares");
+  ares.style.display = ""; ares.className = "msgwin"; ares.textContent = "……！";
+  try {
+    const j = await battlePost({ act: "answer", ans: k });
+    if (j.ok && j.win) {
+      ares.className = "msgwin winflash";
+      ares.textContent = "🎉 " + BSTATE.mon.n + "を たおした！　+" + j.xp + " XP！\n\n【解説】" + j.exp;
+      document.getElementById("amon").style.opacity = ".15";
+    } else if (j.ok) {
+      document.getElementById("arena").classList.add("shake");
+      setTimeout(() => document.getElementById("arena").classList.remove("shake"), 600);
+      ares.className = "msgwin losetext";
+      ares.textContent = "💥 ミス！ 正解は「" + j.ans + "」。\n【解説】" + j.exp +
+        "\n\n" + BSTATE.mon.n + "の はんげき！ HPに -" + j.dmg + "（のこりHP " + j.hp + "）" +
+        (j.down ? "\n……HPが尽きた。三行亭（冒険日誌に3行）で休め。" : "");
+    } else ares.textContent = "判定に しっぱいした（" + (j.error || "?") + "）——盤面のバトルタブから続きができる。";
+  } catch (e) { ares.textContent = "つうしんに しっぱいした——盤面のバトルタブに戦いは残っている。そこから回答してくれ。"; }
+  document.getElementById("abackBtn").style.display = "";
+  BSTATE.row = 0; BSTATE.busy = false;
+  loadAll();
+}
+function battleReset() {
+  document.getElementById("arena").style.display = "none";
+  document.getElementById("monGrid").style.display = "";
+  renderMonGrid(); setIdleMsg("");
+}
+function updateBattleStat() {
+  const el = document.getElementById("bvstat");
+  if (MY === "賢王") { el.textContent = "賢王は仮身で参戦する（HP・MPは減らない。王の鍛錬用）"; return; }
+  if (!(MY && NAMES.includes(MY))) { el.textContent = "登録の間で名を名のると、戦えるようになる。"; return; }
+  const v = (window.VIT || {})[MY];
+  el.textContent = v ? "じぶんのステータス：HP " + v.hp + "／100　MP " + v.mp + "／" + v.mpmax +
+                       (v.hp <= 0 ? "　✖ 戦闘不能（三行亭で回復）" : "")
+                     : "ステータスを よみこみちゅう…";
+}
+renderMonGrid(); updateBattleStat();
+
 /* ---------- 盤面データ ---------- */
 function parseCSV(text) {
   const rows = []; let row = [], cur = "", inq = false;
@@ -665,6 +837,7 @@ async function loadAll() {
     const vit = {};
     if (bg) for (const r of bg) if (NAMES.includes(r[0]) && r[1] !== "" && !isNaN(+r[1]))
       if (!(r[0] in vit)) vit[r[0]] = { hp:+r[1], mpmax:+r[2]||30, mp:+r[3]||0, cond:r[4]||"" };
+    window.VIT = vit; updateBattleStat();
     let order = null, alias = {};
     if (cg) for (const r of cg) {
       if (r[0] === "項目") order = r.slice(1);

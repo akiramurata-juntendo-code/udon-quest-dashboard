@@ -44,13 +44,17 @@
   summary { cursor:pointer; color:var(--gold); font-size:14px; }
   details ol { margin:8px 0 4px; padding-left:22px; font-size:13.5px; line-height:1.9; }
 
-  .map { display:flex; gap:8px; overflow-x:auto; padding:6px 2px 10px; }
-  .stop { min-width:86px; text-align:center; border:2px solid #555; border-radius:8px; padding:6px 4px; background:#0c0c30;
-          color:var(--dim); font-size:11.5px; flex:0 0 auto; }
-  .stop .dd { font-size:13px; }
-  .stop.past { border-color:#3a6; color:#7c9; }
-  .stop.today { border-color:var(--gold); color:#fff; box-shadow:0 0 10px #ffd75e66; transform:scale(1.06); }
-  .stop.today .dd { color:var(--gold); }
+  .fieldwrap { overflow-x:auto; }
+  .fieldwrap svg { display:block; min-width:760px; width:100%; height:auto; }
+  .mapcap { border:2px solid #444; border-radius:8px; background:#0c0c30; padding:8px 12px; margin-top:8px;
+            font-size:14px; min-height:40px; }
+  .mapcap .lv { color:var(--gold); }
+  .mapcap .here { color:#7fdc9a; font-size:12px; border:1px solid #7fdc9a; border-radius:6px; padding:0 5px; margin-left:8px; }
+  .node { cursor:pointer; }
+  @keyframes bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
+  .bobber { animation: bob 1.3s ease-in-out infinite; }
+  @keyframes ringpulse { 0%{opacity:.9} 50%{opacity:.25} 100%{opacity:.9} }
+  .ring { animation: ringpulse 1.6s ease-in-out infinite; }
 
   .barlog { max-height:340px; overflow-y:auto; border:2px solid #444; border-radius:8px; padding:8px 10px;
             background:#07071c; margin:8px 0; }
@@ -176,8 +180,10 @@
   </div>
 
   <div class="win">
-    <h2>🗺 冒険のちず（8/20 → 8/31 封印の門）</h2>
-    <div class="map" id="map"></div>
+    <h2>🗺 マルガメア大陸 ― 封印の門への道</h2>
+    <div class="sub">隊列は日ごとにすすむ。遅れても大丈夫——じぶんの行から追いつけばいい。土地をタップすると、その地のクエストがわかる。</div>
+    <div class="fieldwrap"><svg id="fieldmap" viewBox="0 0 1000 430" xmlns="http://www.w3.org/2000/svg"></svg></div>
+    <div class="mapcap" id="mapcap"></div>
   </div>
 
   <div class="win">
@@ -342,6 +348,7 @@ async function charSave() {
 function applyMy() {
   if (MY && NAMES.includes(MY))
     document.getElementById("hsub").textContent = "ようこそ、" + MY + " のぼうけんへ ― きょうの一歩は、ここから。";
+  try { drawField(); } catch (e) {}
 }
 function enterMain() {
   document.getElementById("createScreen").style.display = "none";
@@ -386,18 +393,69 @@ if (di < 0) {
   if (md < 820) di = 0; else { di = DAYS.length - 1; after = true; }
 }
 const day = DAYS[di];
-document.getElementById("daybadge").textContent = after ? "クリア後" : "Day " + (di + 1) + "／12";
+document.getElementById("daybadge").textContent = after ? "クリア後" : "LEVEL " + (di + 1);
 document.getElementById("todayland").textContent = after ? "宴の大釜" : "きょうの戦場：" + day.land;
 document.getElementById("todayquest").textContent = after ? "冒険はおわった。よく戦った——あとは宴だ。" : "▶ " + day.q;
 if (!after && day.boss) { const tb = document.getElementById("todayboss"); tb.src = SPRITES[day.boss]; tb.style.display = "block"; }
 
-const mapEl = document.getElementById("map");
-DAYS.forEach((x, i) => {
-  const cls = i < di ? "stop past" : (i === di && !after ? "stop today" : "stop" + (after ? " past" : ""));
-  mapEl.innerHTML += '<div class="' + cls + '"><div class="dd">' + (i < di || after ? "✓ " : "") + x.d + '</div>' +
-                     x.land.split("（")[0] + '</div>';
-});
-setTimeout(() => { const t = mapEl.querySelector(".today"); if (t) t.scrollIntoView({inline:"center", block:"nearest"}); }, 100);
+/* ---------- フィールドマップ ---------- */
+const NODES = [
+  {x:  95, y:345, deco:"🌾"}, {x: 205, y:300, deco:"⚰️"}, {x: 305, y:345, deco:"👑"},
+  {x: 410, y:300, deco:"🛤"}, {x: 495, y:232, deco:"🗼"}, {x: 565, y:290, deco:"🗼"},
+  {x: 655, y:232, deco:"🔨"}, {x: 748, y:282, deco:"🕯"}, {x: 828, y:220, deco:"✨"},
+  {x: 882, y:150, deco:"⛰"}, {x: 930, y:100, deco:"👑"}, {x: 942, y:48,  deco:"🌋"}
+];
+const SVGNS = "http://www.w3.org/2000/svg";
+function sv(tag, attrs) { const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]); return e; }
+function drawField() {
+  const svg = document.getElementById("fieldmap"); svg.innerHTML = "";
+  const land = sv("path", {d: "M20,420 C-10,330 60,260 120,250 C150,180 260,150 340,180 C400,120 520,110 590,150 C650,90 780,70 850,110 C930,60 1000,60 998,120 L998,420 Z",
+    fill: "#12241a", stroke: "#2c5c3f", "stroke-width": 3});
+  svg.appendChild(land);
+  svg.appendChild(sv("path", {d: "M840,120 C880,80 960,70 985,95 L985,180 C930,170 870,160 840,120 Z", fill: "#3a1414", stroke: "#5a1f1f", "stroke-width": 2}));
+  svg.appendChild(sv("path", {d: "M150,270 C180,230 280,220 320,250 C300,290 200,300 150,270 Z", fill: "#26262e", opacity: ".8"}));
+  let road = "M40,395 ";
+  NODES.forEach(p => { road += "L" + p.x + "," + p.y + " "; });
+  svg.appendChild(sv("path", {d: road, fill: "none", stroke: "#c9a35a", "stroke-width": 5,
+    "stroke-dasharray": "1 11", "stroke-linecap": "round"}));
+  const castle = sv("text", {x: 22, y: 405, "font-size": 30}); castle.textContent = "🏰"; svg.appendChild(castle);
+  const clabel = sv("text", {x: 14, y: 424, "font-size": 10, fill: "#8b8ba7"}); clabel.textContent = "マルガメア城"; svg.appendChild(clabel);
+  NODES.forEach((p, i) => {
+    const g = sv("g", {class: "node"}); g.addEventListener("click", () => setStage(i));
+    const cleared = after || i < di, current = !after && i === di;
+    if (current) g.appendChild(sv("circle", {cx: p.x, cy: p.y, r: 21, fill: "none", stroke: "#ffd75e", "stroke-width": 3, class: "ring"}));
+    g.appendChild(sv("circle", {cx: p.x, cy: p.y, r: 13,
+      fill: cleared ? "#8a6d1f" : "#101034", stroke: cleared ? "#ffd75e" : (current ? "#fff" : "#555"), "stroke-width": 2.5}));
+    const lv = sv("text", {x: p.x, y: p.y + 4, "font-size": 11, "text-anchor": "middle",
+      fill: cleared ? "#ffe9a8" : "#8b8ba7", "font-family": "'DotGothic16', monospace"});
+    lv.textContent = cleared ? "✓" : (i + 1); g.appendChild(lv);
+    const boss = DAYS[i].boss;
+    if (boss) { const im = sv("image", {x: p.x - 15, y: p.y - 48, width: 30, height: 30, opacity: cleared ? ".35" : "1"});
+      im.setAttribute("href", SPRITES[boss]); g.appendChild(im);
+    } else { const t = sv("text", {x: p.x, y: p.y - 24, "font-size": 20, "text-anchor": "middle"}); t.textContent = p.deco; g.appendChild(t); }
+    const nm = sv("text", {x: p.x, y: p.y + 30, "font-size": 11, "text-anchor": "middle", fill: current ? "#fff" : "#8b8ba7",
+      "font-family": "'DotGothic16', monospace"});
+    nm.textContent = "Lv" + (i + 1) + " " + DAYS[i].land.split("（")[0]; g.appendChild(nm);
+    svg.appendChild(g);
+  });
+  const pos = after ? NODES[NODES.length - 1] : NODES[di];
+  const mg = sv("g", {class: "bobber"});
+  if (MY && NAMES.includes(MY)) {
+    const me = sv("image", {x: pos.x - 17, y: pos.y - 86, width: 34, height: 34});
+    me.setAttribute("href", SPRITES[MY]); mg.appendChild(me);
+  } else {
+    const fl = sv("text", {x: pos.x, y: pos.y - 58, "font-size": 24, "text-anchor": "middle"}); fl.textContent = "⚔"; mg.appendChild(fl);
+  }
+  svg.appendChild(mg);
+}
+function setStage(i) {
+  const cap = document.getElementById("mapcap");
+  const here = (!after && i === di) ? '<span class="here">いまここ</span>' : "";
+  cap.innerHTML = '<span class="lv">LEVEL ' + (i + 1) + '『' + DAYS[i].land + '』</span>' + here +
+                  '<br>' + DAYS[i].q;
+}
+drawField(); setStage(after ? DAYS.length - 1 : di);
 
 const CHK = ["盤面で、じぶんのクエストの状態をうごかした",
              "きょうのクエストにとりくんだ（じぶんの行）",

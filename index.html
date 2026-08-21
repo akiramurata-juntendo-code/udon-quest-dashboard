@@ -356,11 +356,22 @@
   </div>
 
   <div class="win">
-    <img class="slime" id="slime" alt="うどんスライム">
-    <button class="cmd" onclick="loadAll()">▶ さいよみこみ</button>
-    <a class="cmd" href="https://classroom.google.com" target="_blank" rel="noopener">▶ Classroomへ</a>
-    <a class="cmd" href="#" onclick="reopenCreate();return false">▶ キャラをなおす</a>
-    <span class="msg" id="status">よみこみちゅう…</span>
+    <h2>🔧 このページの そうさ</h2>
+    <div class="helpcards" style="border-top:none;margin-top:4px;padding-top:0">
+      <div class="hcard"><div class="hem">🔄</div>
+        <div class="ht">いますぐ更新</div>
+        <div class="hd">盤面のさいしんデータを、いま取りにいく。<br>ふだんは<b>5分ごとに自動</b>で更新されている</div>
+        <button class="cmd" style="font-size:12.5px;padding:4px 12px;margin-top:6px" onclick="loadAll()">▶ 更新する</button></div>
+      <div class="hcard"><div class="hem">🏫</div>
+        <div class="ht">Classroom をひらく</div>
+        <div class="hd"><b>盤面（クエストボード）への入口</b>と、先生からのお知らせが置いてある場所。クエストの納品・状態がえは盤面で</div>
+        <a class="cmd" style="font-size:12.5px;padding:4px 12px;margin-top:6px" href="https://classroom.google.com" target="_blank" rel="noopener">▶ ひらく</a></div>
+      <div class="hcard"><div class="hem">⚔</div>
+        <div class="ht">キャラクターを 書きなおす</div>
+        <div class="hd">登録の間にもどって、<b>二つ名・特技・意気込み</b>などを書きかえられる（なんどでも）</div>
+        <a class="cmd" style="font-size:12.5px;padding:4px 12px;margin-top:6px" href="#" onclick="reopenCreate();return false">▶ 登録の間へ</a></div>
+    </div>
+    <div class="msg" id="status" style="margin-top:8px"><img class="slime" id="slime" alt="うどんスライム" style="height:26px">よみこみちゅう…</div>
   </div>
 
   <footer>マルガメア王国 御用達 ― データは盤面より自動転写（5分ごと更新）／クエスト・バトルのそうさは盤面で</footer>
@@ -1238,8 +1249,8 @@ async function loadAll() {
     if (repReady && res[4].status !== "fulfilled") labels.push("古文書");
     if (qReady && res[5].status !== "fulfilled") labels.push("動静");
     st.textContent = labels.length
-      ? "いちぶ よみこめず（" + labels.join("・") + "）― すこし まって ▶さいよみこみ"
-      : "さいごのこうしん " + new Date().toLocaleTimeString("ja-JP");
+      ? "いちぶ よみこめず（" + labels.join("・") + "）― すこし待って「いますぐ更新」を"
+      : "🕐 さいごの更新 " + new Date().toLocaleTimeString("ja-JP") + "（5分ごとに自動）";
   } catch (e) {
     st.textContent = "つうしんに しっぱいした！（" + e.message + "）― ▶さいよみこみ をおしてくれ";
     st.className = "err";

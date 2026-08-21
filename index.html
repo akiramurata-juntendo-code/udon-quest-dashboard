@@ -213,7 +213,7 @@
   <div class="win">
     <h2>👣 きょうのすすめかた</h2>
     <details id="firstguide">
-      <summary>はじめての冒険者は、まずここ（4ステップ・10分）</summary>
+      <summary>はじめてガイド（もういちど見たいとき用・4ステップ）</summary>
       <ol>
         <li><a class="cmd gold" style="padding:3px 10px;font-size:13px" href="https://classroom.google.com" target="_blank" rel="noopener">▶ Classroom をひらく</a>　いちばん上の固定投稿「⚔ 冒険の書」に<b>盤面（クエストボード）への入口</b>がある</li>
         <li>盤面の「<b>ゲームの掟</b>」タブを3分よむ（ルールはぜんぶここ）</li>
@@ -221,17 +221,15 @@
         <li>「<b>クエストボード</b>」のじぶんの【チュートリアル】を「完了」にして、「助け合い」タブにあいさつを1行——<b>+10XP、ぼうけんの始まりだ</b></li>
       </ol>
     </details>
-    <div class="todayrow">
-      <img id="todayboss" alt="きょうのボス" style="display:none">
+    <div class="todayrow" style="margin:8px 0 10px">
+      <img id="todayboss" alt="きょうのボス" style="display:none;height:44px">
       <div>
-        <span class="daybadge" id="daybadge">Day -</span>
+        <span class="daybadge" id="daybadge">LEVEL -</span>
         <span class="quest"><span class="land" id="todayland">…</span></span>
-        <div class="quest" id="todayquest" style="margin-top:4px">…</div>
-        <div class="sub" id="todaynote">くわしい完了条件は、盤面のクエストボードの「じぶんの行」に書いてある</div>
+        <div class="sub" id="todayquest" style="margin-top:2px">…</div>
       </div>
     </div>
-    <ul class="chk" id="checklist"></ul>
-    <div class="cheer" id="cheer"></div>
+    <div id="stepCard" class="msgwin" style="margin:0 0 4px"></div>
     <div class="helpcards">
       <div class="hcard"><div class="hem">😵</div>
         <div class="ht">なにを すればいいか わからない</div>
@@ -568,7 +566,7 @@ if (di < 0) {
 const day = DAYS[di];
 document.getElementById("daybadge").textContent = after ? "クリア後" : "LEVEL " + (di + 1);
 document.getElementById("todayland").textContent = after ? "宴の大釜" : "きょうの戦場：" + day.land;
-document.getElementById("todayquest").textContent = after ? "冒険はおわった。よく戦った——あとは宴だ。" : "▶ " + day.q;
+document.getElementById("todayquest").textContent = after ? "冒険はおわった。よく戦った——あとは宴だ。" : "▶ " + day.q + "（くわしくは作戦室で）";
 if (!after && day.boss) { const tb = document.getElementById("todayboss"); tb.src = SPRITES[day.boss]; tb.style.display = "block"; }
 
 /* ---------- フィールドマップ ---------- */
@@ -757,28 +755,64 @@ function closeScene() { document.getElementById("lightbox").classList.remove("on
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeScene(); });
 drawField(); setStage(after ? DAYS.length - 1 : di);
 
-const CHK = ["盤面で、じぶんのクエストの状態をうごかした",
-             "きょうのクエストにとりくんだ（じぶんの行）",
-             "冒険日誌に3行かいた（+10XP・HPも全回復）"];
-const chkEl = document.getElementById("checklist");
+const STEPS = [
+  { t: "盤面をひらいて、じぶんのクエストの状態を うごかす", hint: "未着手 → 進行中 にするだけでいい",
+    btn: "▶ 盤面へ（Classroom）", act: "classroom" },
+  { t: "きょうのクエストに とりくむ", hint: "なにをするかは、作戦室の「きょう」に書いてある",
+    btn: "▶ 作戦室でみる", act: "ops" },
+  { t: "冒険日誌に 3行かく", hint: "+10XP。HPも全回復する（三行亭でそのまま書ける）",
+    btn: "▶ 三行亭へ", act: "inn" }
+];
 function chkKey(i) { return "chk-" + TODAY + "-" + i; }
-function renderChk() {
-  chkEl.innerHTML = "";
-  let onCount = 0;
-  CHK.forEach((t, i) => {
-    const on = localStorage.getItem(chkKey(i)) === "1";
-    if (on) onCount++;
-    const li = document.createElement("li");
-    li.textContent = t; li.className = on ? "on" : "";
-    li.onclick = () => { localStorage.setItem(chkKey(i), on ? "0" : "1"); renderChk(); };
-    chkEl.appendChild(li);
-  });
-  document.getElementById("cheer").textContent =
-    onCount === CHK.length ? "🎉 きょうのぼうけん、みごと！ あしたも王国で会おう。" :
-    onCount > 0 ? "その調子だ。のこり" + (CHK.length - onCount) + "つ。" : "";
+function stepAct(kind) {
+  if (kind === "classroom") window.open("https://classroom.google.com", "_blank");
+  else if (kind === "ops") document.getElementById("opsWin").scrollIntoView({ behavior: "smooth" });
+  else if (kind === "inn") document.getElementById("innWin").scrollIntoView({ behavior: "smooth" });
 }
-renderChk();
-if (!localStorage.getItem("visited")) { document.getElementById("firstguide").open = true; localStorage.setItem("visited", "1"); }
+function renderStep() {
+  const el = document.getElementById("stepCard");
+  el.innerHTML = "";
+  let idx = -1;
+  for (let i = 0; i < STEPS.length; i++) if (localStorage.getItem(chkKey(i)) !== "1") { idx = i; break; }
+  const dots = document.createElement("div");
+  dots.style.cssText = "font-size:13px;color:#8b8ba7;margin-bottom:4px";
+  let dstr = "";
+  for (let i = 0; i < STEPS.length; i++) dstr += (localStorage.getItem(chkKey(i)) === "1" ? "●" : "○");
+  if (idx < 0) {
+    dots.textContent = dstr + "　きょうの三歩、ぜんぶ すんだ";
+    el.appendChild(dots);
+    const done = document.createElement("div");
+    done.style.cssText = "color:var(--hp);font-size:16px";
+    done.textContent = "🎉 きょうのぼうけん、みごと！ あしたも王国で会おう。";
+    el.appendChild(done);
+    const rest = document.createElement("div");
+    rest.className = "sub"; rest.style.marginTop = "4px";
+    rest.textContent = "このあとは自由時間だ——バトルにいどむもよし、酒場で一杯もよし。";
+    el.appendChild(rest);
+    return;
+  }
+  dots.textContent = dstr + "　つぎの いっぽ（" + (idx + 1) + "／3）";
+  el.appendChild(dots);
+  const main = document.createElement("div");
+  main.style.cssText = "font-size:16.5px;margin:2px 0";
+  main.textContent = "▼ " + STEPS[idx].t;
+  el.appendChild(main);
+  const hint = document.createElement("div");
+  hint.className = "sub"; hint.textContent = STEPS[idx].hint;
+  el.appendChild(hint);
+  const row = document.createElement("div");
+  row.className = "frow"; row.style.marginTop = "8px";
+  const go = document.createElement("button");
+  go.className = "cmd"; go.textContent = STEPS[idx].btn;
+  go.onclick = () => stepAct(STEPS[idx].act);
+  row.appendChild(go);
+  const ok = document.createElement("button");
+  ok.className = "cmd gold"; ok.textContent = "✅ できた！";
+  ok.onclick = () => { localStorage.setItem(chkKey(idx), "1"); renderStep(); };
+  row.appendChild(ok);
+  el.appendChild(row);
+}
+renderStep();
 
 /* ---------- 酒場 ---------- */
 function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }

@@ -101,6 +101,21 @@
   .st-sos  { border:1px solid #ff6b6b; color:#ff9b9b; }
   .st-done { border:1px solid var(--gold); color:var(--gold); }
   .st-wait { border:1px solid #555; color:var(--dim); }
+  .chronwrap { overflow-x:auto; margin:6px 0 10px; }
+  .chron { display:grid; min-width:720px; gap:2px; }
+  .ch-h { font-size:11px; color:var(--dim); text-align:center; padding:2px 0; }
+  .ch-h.today { color:var(--gold); }
+  .ch-nm { font-size:12px; color:var(--dim); padding:3px 4px 0 0; white-space:nowrap; }
+  .cc { min-height:22px; border:1px solid #2c2c4a; border-radius:4px; background:#0a0a24;
+        display:flex; flex-wrap:wrap; gap:2px; align-items:center; justify-content:center;
+        padding:2px; cursor:pointer; }
+  .cc.today { border-color:#8a6d1f; }
+  .cc.sel { border-color:var(--gold); box-shadow:0 0 6px #ffd75e55; }
+  .dot { width:9px; height:9px; border-radius:2px; }
+  .d-done { background:var(--gold); }
+  .d-prog { background:var(--mp); }
+  .d-sos  { background:#ff5b5b; }
+  .d-wait { background:#3a3a55; }
 
   .barlog { max-height:340px; overflow-y:auto; border:2px solid #444; border-radius:8px; padding:8px 10px;
             background:#07071c; margin:8px 0; }
@@ -329,6 +344,8 @@
   <div class="win" id="opsWin" style="margin-top:14px">
     <h2>🎯 作戦室 ― パーティーのクエスト全図</h2>
     <div class="sub">だれが・なにを・どこまで。ほうび（XP）と積み残しを見わたして、ゴールまでの道を仲間とねれ。くわしい納品と状態がえは盤面で。</div>
+    <div class="chronwrap"><div class="chron" id="chron"></div></div>
+    <div class="sub" id="chronlegend" style="margin:-4px 0 8px">⏳ 年表：たて＝なかま、よこ＝Day 0→10。石の色は 🟨完了・🟦進行中・🟥SOS・⬛未着手。<b style="color:#fff">マスをタップすると、その人・その日のクエストが下にひらく</b></div>
     <div class="qchips" id="qchips"></div>
     <div class="qlist" id="qlist"><div class="sub">クエストの目録を ひらいている…</div></div>
   </div>
@@ -1022,6 +1039,7 @@ function renderOps() {
   const rows = qParse();
   const chipsEl = document.getElementById("qchips"), listEl = document.getElementById("qlist");
   if (!rows) { listEl.innerHTML = '<div class="sub">クエストの目録は じゅんびちゅう…（さいよみこみ で再挑戦）</div>'; return; }
+  renderChron(rows);
   const todayDay = String(di + 1);
   const defs = [["today", "きょう（Day " + todayDay + "）"], ["late", "積み残し"], ["team", "共通（全員）"]]
     .concat(NAMES.map(function (nm) { return [nm, nm]; })).concat([["all", "すべて"]]);
@@ -1038,9 +1056,16 @@ function renderOps() {
   else if (OPSFILTER === "late") sel = rows.filter(x => Number(x.day) < Number(todayDay) && x.st !== "完了");
   else if (OPSFILTER === "team") sel = rows.filter(x => x.who === "全員");
   else if (OPSFILTER === "all") sel = rows;
+  else if (OPSFILTER.indexOf("cell:") === 0) {
+    const parts = OPSFILTER.split(":");
+    sel = rows.filter(x => x.who === parts[1] && x.day === parts[2]);
+  }
   else sel = rows.filter(x => x.who === OPSFILTER || x.who === "全員");
   const doneN = sel.filter(x => x.st === "完了").length;
-  let h = '<div class="sub" style="margin-bottom:2px">' + sel.length + '件（完了 ' + doneN +
+  let h = '<div class="sub" style="margin-bottom:2px">' +
+          (OPSFILTER.indexOf("cell:") === 0
+            ? '⏳ ' + (OPSFILTER.split(":")[1] === "全員" ? "みんな" : OPSFILTER.split(":")[1] === "チーム" ? "ボス戦" : OPSFILTER.split(":")[1]) + ' の Day ' + OPSFILTER.split(":")[2] + '：' : '') +
+          sel.length + '件（完了 ' + doneN +
           (OPSFILTER === "late" && sel.length === 0 ? '）——積み残しゼロ。みごとな隊列だ' : '）') + '</div>';
   if (!sel.length && OPSFILTER !== "late") h += '<div class="sub">このならびに クエストは ない。</div>';
   for (const x of sel) {
@@ -1058,6 +1083,46 @@ function renderOps() {
 function jumpOps(nm) {
   OPSFILTER = nm; renderOps();
   document.getElementById("opsWin").scrollIntoView({ behavior: "smooth" });
+}
+function renderChron(rows) {
+  const el = document.getElementById("chron");
+  el.innerHTML = "";
+  if (!rows || !rows.length) return;
+  const days = Array.from(new Set(rows.map(x => x.day).filter(d => d !== ""))).sort((a, b) => Number(a) - Number(b));
+  const owners = [];
+  for (const nm of NAMES) owners.push(nm);
+  if (rows.some(x => x.who === "全員")) owners.push("全員");
+  if (rows.some(x => x.who === "チーム")) owners.push("チーム");
+  el.style.gridTemplateColumns = "64px repeat(" + days.length + ", 1fr)";
+  const todayDay = String(di + 1);
+  const corner = document.createElement("div"); corner.className = "ch-h"; el.appendChild(corner);
+  for (const d of days) {
+    const h = document.createElement("div");
+    h.className = "ch-h" + (d === todayDay ? " today" : "");
+    h.textContent = (d === todayDay ? "▼" : "") + "D" + d;
+    el.appendChild(h);
+  }
+  for (const ow of owners) {
+    const lab = document.createElement("div"); lab.className = "ch-nm";
+    lab.textContent = ow === "全員" ? "みんな" : (ow === "チーム" ? "ボス戦" : ow);
+    el.appendChild(lab);
+    for (const d of days) {
+      const cell = document.createElement("div");
+      cell.className = "cc" + (d === todayDay ? " today" : "") +
+        (OPSFILTER === "cell:" + ow + ":" + d ? " sel" : "");
+      const qs = rows.filter(x => x.who === ow && x.day === d);
+      for (const q of qs.slice(0, 5)) {
+        const dot = document.createElement("div");
+        dot.className = "dot " + (q.st === "完了" ? "d-done" : q.st === "進行中" ? "d-prog" : q.st === "SOS" ? "d-sos" : "d-wait");
+        dot.title = q.q.slice(0, 40);
+        cell.appendChild(dot);
+      }
+      if (qs.length > 5) { const m = document.createElement("span"); m.style.cssText = "font-size:9px;color:#8b8ba7"; m.textContent = "+" + (qs.length - 5); cell.appendChild(m); }
+      cell.dataset.ow = ow; cell.dataset.d = d;
+      cell.onclick = function () { OPSFILTER = "cell:" + this.dataset.ow + ":" + this.dataset.d; renderOps(); };
+      el.appendChild(cell);
+    }
+  }
 }
 
 /* ---------- 盤面データ ---------- */

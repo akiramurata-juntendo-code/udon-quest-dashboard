@@ -88,6 +88,19 @@
     width:100%; background:#101034; color:#fff; border:2px solid #fff; border-radius:6px;
     font-family:inherit; font-size:14px; padding:6px 8px; }
   .recbox textarea { min-height:56px; }
+  .qchips { display:flex; gap:6px; flex-wrap:wrap; margin:6px 0 10px; }
+  .qchip { border:2px solid #555; border-radius:8px; background:#0c0c30; color:var(--dim);
+           font-family:inherit; font-size:12.5px; padding:4px 10px; cursor:pointer; }
+  .qchip.on { border-color:var(--gold); color:var(--gold); }
+  .qlist { display:grid; gap:8px; max-height:420px; overflow-y:auto; padding-right:4px; }
+  .qcard { border:2px solid #444; border-left-width:6px; border-radius:8px; background:#0c0c30; padding:8px 10px; }
+  .qcard .qhead { font-size:12px; color:var(--dim); margin-bottom:3px; }
+  .qcard .qtxt { font-size:13.5px; line-height:1.7; }
+  .qst { display:inline-block; border-radius:6px; padding:0 6px; font-size:11.5px; margin-right:6px; }
+  .st-prog { border:1px solid var(--mp); color:var(--mp); }
+  .st-sos  { border:1px solid #ff6b6b; color:#ff9b9b; }
+  .st-done { border:1px solid var(--gold); color:var(--gold); }
+  .st-wait { border:1px solid #555; color:var(--dim); }
 
   .barlog { max-height:340px; overflow-y:auto; border:2px solid #444; border-radius:8px; padding:8px 10px;
             background:#07071c; margin:8px 0; }
@@ -312,6 +325,13 @@
   </div>
 
   <div class="grid" id="party"></div>
+
+  <div class="win" id="opsWin" style="margin-top:14px">
+    <h2>🎯 作戦室 ― パーティーのクエスト全図</h2>
+    <div class="sub">だれが・なにを・どこまで。ほうび（XP）と積み残しを見わたして、ゴールまでの道を仲間とねれ。くわしい納品と状態がえは盤面で。</div>
+    <div class="qchips" id="qchips"></div>
+    <div class="qlist" id="qlist"><div class="sub">クエストの目録を ひらいている…</div></div>
+  </div>
 
   <div class="win" style="margin-top:14px">
     <h2>🏆 現在の王座（毎日入れ替わる。奪いにいけ）</h2>
@@ -959,6 +979,7 @@ function renderStatus(qg) {
     else if (st === "SOS") { W[who].sos++; if (!W[who].sosq) W[who].sosq = q; SOSL.push({ who: who, q: q }); }
   }
   window.WORK = W;
+  renderOps();
   if (SOSL.length) {
     let h = '<div style="color:#ff9b9b;font-size:15px">🆘 たすけを もとめている なかまが いる！</div>';
     for (const x of SOSL)
@@ -972,6 +993,71 @@ function renderStatus(qg) {
       'みんなのクエスト：' + TEAM.f + '／' + TEAM.t + ' 完了</span>';
     document.getElementById("sosWin").style.borderColor = "#fff";
   }
+}
+
+/* ---------- 作戦室 ---------- */
+let OPSFILTER = "today";
+function qParse() {
+  const qg = window.QGRID;
+  if (!qg) return null;
+  let hi = qg.findIndex(r => r[0] === "Day");
+  const out = [];
+  if (hi >= 0) for (let i = hi + 1; i < qg.length; i++) {
+    const r = qg[i];
+    if (!String(r[2] || "").trim() || !String(r[3] || "").trim()) continue;
+    out.push({ day: String(r[0] || "").trim(), date: String(r[1] || "").trim(),
+               q: String(r[2]).trim(), who: String(r[3]).trim(), xp: String(r[4] || "").trim(),
+               st: String(r[5] || "").trim() || "未着手", done: String(r[6] || "").trim(),
+               buddy: String(r[7] || "").trim() });
+  }
+  return out;
+}
+function stBadge(st) {
+  if (st === "完了") return '<span class="qst st-done">✓ 完了</span>';
+  if (st === "進行中") return '<span class="qst st-prog">▶ 進行中</span>';
+  if (st === "SOS") return '<span class="qst st-sos">🆘 SOS</span>';
+  return '<span class="qst st-wait">… 未着手</span>';
+}
+function renderOps() {
+  const rows = qParse();
+  const chipsEl = document.getElementById("qchips"), listEl = document.getElementById("qlist");
+  if (!rows) { listEl.innerHTML = '<div class="sub">クエストの目録は じゅんびちゅう…（さいよみこみ で再挑戦）</div>'; return; }
+  const todayDay = String(di + 1);
+  const defs = [["today", "きょう（Day " + todayDay + "）"], ["late", "積み残し"], ["team", "共通（全員）"]]
+    .concat(NAMES.map(function (nm) { return [nm, nm]; })).concat([["all", "すべて"]]);
+  chipsEl.innerHTML = "";
+  for (const dpair of defs) {
+    const b = document.createElement("button");
+    b.className = "qchip" + (OPSFILTER === dpair[0] ? " on" : "");
+    b.textContent = dpair[1];
+    b.onclick = function () { OPSFILTER = dpair[0]; renderOps(); };
+    chipsEl.appendChild(b);
+  }
+  let sel;
+  if (OPSFILTER === "today") sel = rows.filter(x => x.day === todayDay);
+  else if (OPSFILTER === "late") sel = rows.filter(x => Number(x.day) < Number(todayDay) && x.st !== "完了");
+  else if (OPSFILTER === "team") sel = rows.filter(x => x.who === "全員");
+  else if (OPSFILTER === "all") sel = rows;
+  else sel = rows.filter(x => x.who === OPSFILTER || x.who === "全員");
+  const doneN = sel.filter(x => x.st === "完了").length;
+  let h = '<div class="sub" style="margin-bottom:2px">' + sel.length + '件（完了 ' + doneN +
+          (OPSFILTER === "late" && sel.length === 0 ? '）——積み残しゼロ。みごとな隊列だ' : '）') + '</div>';
+  if (!sel.length && OPSFILTER !== "late") h += '<div class="sub">このならびに クエストは ない。</div>';
+  for (const x of sel) {
+    const bcol = x.st === "SOS" ? "#ff6b6b" : x.st === "進行中" ? "var(--mp)" : x.st === "完了" ? "var(--gold)" : "#444";
+    h += '<div class="qcard" style="border-left-color:' + bcol + '">' +
+      '<div class="qhead">' + stBadge(x.st) + 'Day ' + esc(x.day) + '（' + esc(x.date) + '）　担当：<b style="color:#fff">' + esc(x.who) + '</b>' +
+      (x.xp ? '　ほうび <b style="color:var(--xp)">+' + esc(x.xp) + 'XP</b>' : '') +
+      (x.done ? '　✓ ' + esc(x.done) : '') + '</div>' +
+      '<div class="qtxt">' + esc(x.q) + '</div>' +
+      (x.buddy && x.buddy !== "─" ? '<div class="qhead" style="margin-top:3px">バディ確認：' + esc(x.buddy) + '</div>' : '') +
+      '</div>';
+  }
+  listEl.innerHTML = h;
+}
+function jumpOps(nm) {
+  OPSFILTER = nm; renderOps();
+  document.getElementById("opsWin").scrollIntoView({ behavior: "smooth" });
 }
 
 /* ---------- 盤面データ ---------- */
@@ -1021,6 +1107,7 @@ async function loadAll() {
     if (!pg && !bg && !cg) throw new Error("全フィード失敗");
     renderBar(brg);
     renderCodex(rpg);
+    window.QGRID = qg;
     renderStatus(qg);
 
     const members = {};
@@ -1074,8 +1161,9 @@ async function loadAll() {
           let line = '<div class="meta">クエスト <span style="color:var(--xp)">' +
             "▓".repeat(w.f) + "░".repeat(Math.max(0, w.t - w.f)) + '</span> ' + w.f + '／' + w.t + ' 完了' +
             (w.sos ? '　<span class="down">🆘 SOS中：' + esc(w.sosq) + '</span>' : '') + '</div>';
-          line += '<div class="meta" style="color:#cfcfe8">いま：' +
-            (w.sos ? esc(w.sosq) + ' でこまっている' : (w.cur ? esc(w.cur) : 'すすめている最中のクエストはない')) + '</div>';
+          line += '<div class="meta" style="color:#cfcfe8;cursor:pointer" data-nm="' + n + '" onclick="jumpOps(this.dataset.nm)">いま：' +
+            (w.sos ? esc(w.sosq) + ' でこまっている' : (w.cur ? esc(w.cur) : 'すすめている最中のクエストはない')) +
+            '　<span style="color:var(--gold)">▶ 作戦室</span></div>';
           return line;
         })() +
         '</div></div>';

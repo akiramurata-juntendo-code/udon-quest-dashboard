@@ -307,6 +307,10 @@
     <div class="teambar" id="teambar">░░░░░░░░░░░░░░░░░░░░</div>
   </div>
 
+  <div class="win" id="sosWin">
+    <div id="sosBody" class="sub">なかまの動静を よみこみちゅう…</div>
+  </div>
+
   <div class="grid" id="party"></div>
 
   <div class="win" style="margin-top:14px">
@@ -338,7 +342,8 @@ const FEEDS = {
   battle:  "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6vpQtwW9KeWYByDA1ZW1rHd5tUJ3DU28V1tvs9BBdcL2wtMV5UlxfVSZSqrUXK0-4l0OfDO2SaCS2/pub?gid=984815449&single=true&output=csv",
   chara:   "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6vpQtwW9KeWYByDA1ZW1rHd5tUJ3DU28V1tvs9BBdcL2wtMV5UlxfVSZSqrUXK0-4l0OfDO2SaCS2/pub?gid=1761778379&single=true&output=csv",
   bar:     "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6vpQtwW9KeWYByDA1ZW1rHd5tUJ3DU28V1tvs9BBdcL2wtMV5UlxfVSZSqrUXK0-4l0OfDO2SaCS2/pub?gid=1025282135&single=true&output=csv",
-  reports: "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6vpQtwW9KeWYByDA1ZW1rHd5tUJ3DU28V1tvs9BBdcL2wtMV5UlxfVSZSqrUXK0-4l0OfDO2SaCS2/pub?gid=806804526&single=true&output=csv"
+  reports: "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6vpQtwW9KeWYByDA1ZW1rHd5tUJ3DU28V1tvs9BBdcL2wtMV5UlxfVSZSqrUXK0-4l0OfDO2SaCS2/pub?gid=806804526&single=true&output=csv",
+  quests:  "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6vpQtwW9KeWYByDA1ZW1rHd5tUJ3DU28V1tvs9BBdcL2wtMV5UlxfVSZSqrUXK0-4l0OfDO2SaCS2/pub?gid=119268335&single=true&output=csv"
 };
 const GAS_EXEC = "https://script.google.com/macros/s/AKfycbx7V0c1pQaoFIsfHqTVojCpimsek_kPqH5Wuk1bQDHmG49j-SCPF0QmNO9PWyVVGsun/exec";
 
@@ -929,6 +934,46 @@ function renderCodex(grid) {
     '<div style="margin-top:6px">' + chips + '</div>';
 }
 
+/* ---------- なかまの動静 ---------- */
+function renderStatus(qg) {
+  const el = document.getElementById("sosBody");
+  window.WORK = null;
+  if (!qg) { el.textContent = "なかまの動静は じゅんびちゅう…"; return; }
+  let hi = qg.findIndex(r => r[0] === "Day");
+  const W = {}; NAMES.forEach(n => W[n] = { t: 0, f: 0, prog: 0, sos: 0, cur: "", sosq: "" });
+  const TEAM = { t: 0, f: 0 }; const SOSL = [];
+  if (hi >= 0) for (let i = hi + 1; i < qg.length; i++) {
+    const r = qg[i];
+    const who = String(r[3] || "").trim(), st = String(r[5] || "").trim();
+    let q = String(r[2] || "").trim().replace(/^【[^】]*】/, "").split("（")[0].slice(0, 26);
+    if (!who || !String(r[2] || "").trim()) continue;
+    if (who === "全員") {
+      TEAM.t++; if (st === "完了") TEAM.f++;
+      if (st === "SOS") SOSL.push({ who: "みんな", q: q });
+      continue;
+    }
+    if (!W[who]) continue;
+    W[who].t++;
+    if (st === "完了") W[who].f++;
+    else if (st === "進行中") { W[who].prog++; if (!W[who].cur) W[who].cur = q; }
+    else if (st === "SOS") { W[who].sos++; if (!W[who].sosq) W[who].sosq = q; SOSL.push({ who: who, q: q }); }
+  }
+  window.WORK = W;
+  if (SOSL.length) {
+    let h = '<div style="color:#ff9b9b;font-size:15px">🆘 たすけを もとめている なかまが いる！</div>';
+    for (const x of SOSL)
+      h += '<div style="font-size:14px;margin:4px 0"><span style="color:var(--gold)">' + esc(x.who) + '</span>：' + esc(x.q) +
+           '　<span class="sub">かけつけて たすけると <b style="color:var(--hp)">+30XP</b>（助け合いタブへ）</span></div>';
+    el.innerHTML = h;
+    document.getElementById("sosWin").style.borderColor = "#ff6b6b";
+  } else {
+    el.innerHTML = '🕊 いま、SOSは ない。' +
+      '<span class="sub">——30分つまったら、ためらわず SOS を（出した者にも +10XP のほうび）。' +
+      'みんなのクエスト：' + TEAM.f + '／' + TEAM.t + ' 完了</span>';
+    document.getElementById("sosWin").style.borderColor = "#fff";
+  }
+}
+
 /* ---------- 盤面データ ---------- */
 function parseCSV(text) {
   const rows = []; let row = [], cur = "", inq = false;
@@ -960,19 +1005,23 @@ async function loadAll() {
   st.textContent = "よみこみちゅう…"; st.className = "msg";
   const barReady = FEEDS.bar.indexOf("PASTE_") !== 0;
   const repReady = FEEDS.reports.indexOf("PASTE_") !== 0 && codexUnlocked();
+  const qReady = FEEDS.quests.indexOf("PASTE_") !== 0;
   try {
     const jobs = [getGrid(FEEDS.party), getGrid(FEEDS.battle), getGrid(FEEDS.chara),
                   barReady ? getGrid(FEEDS.bar) : Promise.reject(new Error("未接続")),
-                  repReady ? getGrid(FEEDS.reports) : Promise.reject(new Error("封印中"))];
+                  repReady ? getGrid(FEEDS.reports) : Promise.reject(new Error("封印中")),
+                  qReady ? getGrid(FEEDS.quests) : Promise.reject(new Error("未接続"))];
     const res = await Promise.allSettled(jobs);
     const pg = res[0].status === "fulfilled" ? res[0].value : null;
     const bg = res[1].status === "fulfilled" ? res[1].value : null;
     const cg = res[2].status === "fulfilled" ? res[2].value : null;
     const brg = res[3].status === "fulfilled" ? res[3].value : null;
     const rpg = res[4].status === "fulfilled" ? res[4].value : null;
+    const qg = res[5].status === "fulfilled" ? res[5].value : null;
     if (!pg && !bg && !cg) throw new Error("全フィード失敗");
     renderBar(brg);
     renderCodex(rpg);
+    renderStatus(qg);
 
     const members = {};
     if (pg) for (const r of pg) {
@@ -1019,11 +1068,22 @@ async function loadAll() {
         bar(v.hp, "var(--hp)", "HP", v.hp + "/100") +
         bar(v.mpmax ? v.mp / v.mpmax * 100 : 0, "var(--mp)", "MP", v.mp + "/" + v.mpmax) +
         bar((m.xp||0) / topxp * 100, "var(--xp)", "XP", String(m.xp||0)) +
+        (function () {
+          const w = (window.WORK || {})[n];
+          if (!w || !w.t) return "";
+          let line = '<div class="meta">クエスト <span style="color:var(--xp)">' +
+            "▓".repeat(w.f) + "░".repeat(Math.max(0, w.t - w.f)) + '</span> ' + w.f + '／' + w.t + ' 完了' +
+            (w.sos ? '　<span class="down">🆘 SOS中：' + esc(w.sosq) + '</span>' : '') + '</div>';
+          line += '<div class="meta" style="color:#cfcfe8">いま：' +
+            (w.sos ? esc(w.sosq) + ' でこまっている' : (w.cur ? esc(w.cur) : 'すすめている最中のクエストはない')) + '</div>';
+          return line;
+        })() +
         '</div></div>';
     }
     const labels = ["パーティー","バトル","キャラクター"].filter((_, i) => res[i].status !== "fulfilled");
     if (barReady && res[3].status !== "fulfilled") labels.push("酒場");
     if (repReady && res[4].status !== "fulfilled") labels.push("古文書");
+    if (qReady && res[5].status !== "fulfilled") labels.push("動静");
     st.textContent = labels.length
       ? "いちぶ よみこめず（" + labels.join("・") + "）― すこし まって ▶さいよみこみ"
       : "さいごのこうしん " + new Date().toLocaleTimeString("ja-JP");

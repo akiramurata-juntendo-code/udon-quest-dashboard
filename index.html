@@ -37,8 +37,13 @@
   .chk li.on { color:var(--dim); text-decoration:line-through; }
   .chk li.on::before { content:"☑ "; color:var(--hp); }
   .cheer { color:var(--hp); font-size:14px; min-height:18px; margin:2px 0 6px; }
-  .help3 { border-top:1px dashed #444; margin-top:10px; padding-top:8px; font-size:12.5px; color:var(--dim); line-height:1.9; }
-  .help3 b { color:#fff; font-weight:normal; }
+  .helpcards { display:grid; grid-template-columns:repeat(auto-fit, minmax(215px, 1fr)); gap:10px;
+               border-top:1px dashed #444; margin-top:12px; padding-top:12px; }
+  .hcard { border:2px solid #555; border-radius:10px; background:#0c0c30; padding:10px 12px; }
+  .hcard .hem { font-size:24px; }
+  .hcard .ht { font-size:14.5px; color:#fff; margin:4px 0 6px; }
+  .hcard .hd { font-size:12.5px; color:var(--dim); line-height:1.9; }
+  .hcard .hd b { color:var(--gold); font-weight:normal; }
 
   details { border:2px solid #fff; border-radius:8px; background:#0c0c30; padding:8px 12px; margin:4px 0 10px; }
   summary { cursor:pointer; color:var(--gold); font-size:14px; }
@@ -199,11 +204,18 @@
     </div>
     <ul class="chk" id="checklist"></ul>
     <div class="cheer" id="cheer"></div>
-    <div class="help3">
-      🧭 <b>こまったら</b>：
-      なにをすればいいか わからない → 盤面の<b>じぶんの行</b>と、この画面の<b>きょうのすすめかた</b>／
-      30分つまった → 状態を「<b>SOS</b>」に（+10XP。かくすことが唯一の反則）／
-      つかれた → した↓の<b>酒場</b>へ
+    <div class="helpcards">
+      <div class="hcard"><div class="hem">😵</div>
+        <div class="ht">なにを すればいいか わからない</div>
+        <div class="hd">①すぐ上の<b>「きょうのクエスト」</b>を読む<br>②盤面をひらいて、<b>じぶんの名前の行</b>を見る——やることは、ぜんぶそこに書いてある</div>
+        <a class="cmd" style="font-size:12px;padding:4px 10px;margin-top:6px" href="https://classroom.google.com" target="_blank" rel="noopener">▶ 盤面へ（Classroom経由）</a></div>
+      <div class="hcard"><div class="hem">🆘</div>
+        <div class="ht">30分 つまっている</div>
+        <div class="hd">盤面で じぶんのクエストの状態を<b>「SOS」</b>にかえるだけ。なかまに知らせが飛ぶ。<br>SOSを出すと<b>+10XP</b>——恥ではなく、ほうび。かくすことだけが、このチームの反則だ</div></div>
+      <div class="hcard"><div class="hem">😮‍💨</div>
+        <div class="ht">つかれた・話したい</div>
+        <div class="hd">酒場で一杯やっていけ。注文でも、相談でも、ぐちでもいい。マスターは昼と夜に返事を書く</div>
+        <a class="cmd" style="font-size:12px;padding:4px 10px;margin-top:6px" href="#" onclick="document.getElementById('barWin').scrollIntoView({behavior:'smooth'});return false">▶ 酒場へ</a></div>
     </div>
   </div>
 
@@ -264,7 +276,7 @@
     <div id="codexBody"></div>
   </div>
 
-  <div class="win">
+  <div class="win" id="barWin">
     <h2>🍶 酒場「まるがま亭」― 盤面でゆいいつ、XPが発生しない止まり木</h2>
     <div class="sub">無口なマスターは<b>昼13時ごろ</b>と<b>夜22時ごろ</b>に店に来て、たまった注文と相談にまとめて返事を書く。即レスを期待するな——酒場とはそういう場所だ。店の掟は盤面の酒場タブの張り紙にある。</div>
     <div class="barlog" id="barlog"><div class="sub">とびらを あけている…</div></div>

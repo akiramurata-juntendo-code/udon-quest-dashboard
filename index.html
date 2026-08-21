@@ -585,21 +585,21 @@ const TILEMAP = [
   "...............................................vvv",
   "..............................................vvvv",
   "..............................................vvvv",
-  ".......................................ggggggvvvvv",
-  "..............................ggggggggggrrrrvvvvvv",
-  "......................ggggggggggggggggggrrrrvvvvvv",
-  "................ggggggggggggggggggggggggrrrvvvvvvv",
-  "...........gggggggggggggggggggggggggggggrrrvvvvvvv",
-  ".........mmmmmmmgggggggggggggggggggggggggggggggggg",
-  ".......mmmmmmmmmmmgggggggggggggggggggggggggggggggg",
-  "...ggggmmmmmmmmmmmgggggggggggggggggggggggggggggggg",
-  "gggggggmmmmmmmmmmmgggggggggggggggggggggggggggggggg",
-  "gggggggggmmmmmmmgggggggggggggggggggggggggggggggggg",
-  "gggggggggggggggggggggggggggggggggggggggggggggggggg",
-  "gggggggggggggggggggggggggggggggggggggggggggggggggg",
-  "gggggggggggggggggggggggggggggggggggggggggggggggggg",
-  "gggggggggggggggggggggggggggggggggggggggggggggggggg",
-  "gggggggggggggggggggggggggggggggggggggggggggggggggg",
+  ".......................................ggMgggvvvvv",
+  "..............................gggMMMMMMMMMMMvvvvvv",
+  "......................gMMMMMMMMMMMMMggggMMMMvvvvvv",
+  "................ggMMMMMMMMMgggggffffffggMMMvvvvvvv",
+  "...........gMMMMMMMMggggggggggggggffffggMMMvvvvvvv",
+  ".........mmmmmmmggggfffggggggggggggggggggggggggggg",
+  ".......mmmmmmmmmmmfffffggggggggggggggggggggggggggg",
+  "...ggMMmmmmmmmmmmmgfgfffgggggggggggggggggggggggggg",
+  "MMMMMMgmmmmmmmmmmmggggggggggggffffgggggggggggggggg",
+  "MMggggfffmmmmmmmggggggggggggggfffffggggggggggggggg",
+  "ggggggfffggggggggggggggggggffffffffggggggggggggggg",
+  "ggggggfffffggggggggggggggggggffffggggggggggggggggg",
+  "ggggggggggggggggffgggggggggggggggggggggggggggggggg",
+  "gggggggggggggffffffggggggggggggggggggggggggggggggg",
+  "gggggggggggggffffffggggggggggggggggggggggggggggggg",
   "gggggggggggggggggggggggggggggggggggggggggggggggggg"
 ];
 const SVGNS = "http://www.w3.org/2000/svg";
@@ -619,28 +619,65 @@ function drawFlag(svg, x, y) {
   tR(svg, x + 1, y - 11, 11, 2, "#8a6d1f");
 }
 function outlined(t) { t.setAttribute("stroke", "#05051e"); t.setAttribute("stroke-width", "3"); t.setAttribute("paint-order", "stroke"); return t; }
+function isSea(tx, ty) {
+  if (ty < 0 || ty >= TILEMAP.length || tx < 0 || tx >= TILEMAP[0].length) return false;
+  return TILEMAP[ty][tx] === ".";
+}
+function drawTree(svg, X, Y) {
+  tR(svg, X + 3, Y + 7, 14, 9, "#1e6b26");
+  tR(svg, X + 5, Y + 3, 10, 7, "#2f8f3a");
+  tR(svg, X + 6, Y + 4, 4, 3, "#54c454");
+  tR(svg, X + 8, Y + 16, 4, 4, "#6b4423");
+}
+function drawMountain(svg, X, Y) {
+  svg.appendChild(sv("polygon", {points: (X+10)+","+(Y+1)+" "+(X+1)+","+(Y+19)+" "+(X+19)+","+(Y+19),
+    fill: "#c8c8d4", stroke: "#26263a", "stroke-width": 1.5}));
+  svg.appendChild(sv("polygon", {points: (X+10)+","+(Y+1)+" "+(X+13)+","+(Y+8)+" "+(X+7)+","+(Y+8),
+    fill: "#ffffff"}));
+  svg.appendChild(sv("polygon", {points: (X+10)+","+(Y+1)+" "+(X+19)+","+(Y+19)+" "+(X+13)+","+(Y+19),
+    fill: "#9a9aae"}));
+}
 function drawField() {
   const svg = document.getElementById("fieldmap"); svg.innerHTML = "";
   const TS = 20;
+  const defs = sv("defs", {});
+  const pg = sv("pattern", {id: "pGrass", width: 20, height: 20, patternUnits: "userSpaceOnUse"});
+  pg.appendChild(sv("rect", {x: 0, y: 0, width: 20, height: 20, fill: "#46ac46"}));
+  pg.appendChild(sv("rect", {x: 3, y: 4, width: 3, height: 3, fill: "#3c983c"}));
+  pg.appendChild(sv("rect", {x: 13, y: 9, width: 3, height: 3, fill: "#3c983c"}));
+  pg.appendChild(sv("rect", {x: 7, y: 15, width: 3, height: 3, fill: "#3c983c"}));
+  pg.appendChild(sv("rect", {x: 16, y: 2, width: 2, height: 2, fill: "#54c454"}));
+  defs.appendChild(pg);
+  const ps = sv("pattern", {id: "pSea", width: 20, height: 20, patternUnits: "userSpaceOnUse"});
+  ps.appendChild(sv("rect", {x: 0, y: 0, width: 20, height: 20, fill: "#2a52c4"}));
+  ps.appendChild(sv("rect", {x: 2, y: 5, width: 8, height: 2, fill: "#4a72e4"}));
+  ps.appendChild(sv("rect", {x: 11, y: 13, width: 8, height: 2, fill: "#4a72e4"}));
+  ps.appendChild(sv("rect", {x: 5, y: 16, width: 4, height: 2, fill: "#1e3c94"}));
+  defs.appendChild(ps);
+  const pv = sv("pattern", {id: "pLava", width: 20, height: 20, patternUnits: "userSpaceOnUse"});
+  pv.appendChild(sv("rect", {x: 0, y: 0, width: 20, height: 20, fill: "#6b1a0e"}));
+  pv.appendChild(sv("rect", {x: 4, y: 6, width: 6, height: 2, fill: "#a83a1e"}));
+  pv.appendChild(sv("rect", {x: 12, y: 14, width: 5, height: 2, fill: "#a83a1e"}));
+  defs.appendChild(pv);
+  svg.appendChild(defs);
   for (let ty = 0; ty < TILEMAP.length; ty++) {
     const row = TILEMAP[ty];
     for (let tx = 0; tx < row.length; tx++) {
       const ch = row[tx], X = tx * TS, Y = ty * TS, hsh = (tx * 7 + ty * 13) % 97;
-      if (ch === ".") {
-        tR(svg, X, Y, TS, TS, (tx + ty) % 2 ? "#0d3160" : "#0b2a52");
-        if (hsh % 9 === 0) tR(svg, X + 4, Y + 9, 11, 2, "#2a5c96");
-        continue;
-      }
-      let a = "#2f7a33", b = "#2a6e2e";
-      if (ch === "m") { a = "#4a4a58"; b = "#42424e"; }
-      else if (ch === "v") { a = "#7a1f12"; b = "#6b1a0e"; }
-      else if (ch === "r") { a = "#6e6e62"; b = "#62625a"; }
-      tR(svg, X, Y, TS, TS, (tx + ty) % 2 ? a : b);
-      if (ch === "g" && hsh % 13 === 0) { tR(svg, X + 5, Y + 4, 10, 8, "#1c5220"); tR(svg, X + 9, Y + 12, 3, 5, "#5b3a1e"); }
-      else if (ch === "g" && hsh % 17 === 3) { tR(svg, X + 8, Y + 8, 4, 4, "#e8e26a"); }
+      if (ch === ".") { tR(svg, X, Y, TS, TS, "url(#pSea)"); continue; }
+      if (ch === "v") tR(svg, X, Y, TS, TS, "url(#pLava)");
+      else if (ch === "m") tR(svg, X, Y, TS, TS, (tx + ty) % 2 ? "#4a4a58" : "#42424e");
+      else tR(svg, X, Y, TS, TS, "url(#pGrass)");
+      if (isSea(tx - 1, ty)) tR(svg, X, Y, 4, TS, "#e8d89a");
+      if (isSea(tx + 1, ty)) tR(svg, X + TS - 4, Y, 4, TS, "#e8d89a");
+      if (isSea(tx, ty - 1)) tR(svg, X, Y, TS, 4, "#e8d89a");
+      if (isSea(tx, ty + 1)) tR(svg, X, Y + TS - 4, TS, 4, "#e8d89a");
+      if (ch === "f") drawTree(svg, X, Y);
+      else if (ch === "M") drawMountain(svg, X, Y);
+      else if (ch === "g" && hsh % 23 === 3) { tR(svg, X + 8, Y + 8, 4, 4, "#f0e868"); tR(svg, X + 9, Y + 9, 2, 2, "#e07898"); }
+      else if (ch === "g" && hsh % 19 === 5) drawTree(svg, X, Y);
       else if (ch === "m" && hsh % 7 === 0) { tR(svg, X + 6, Y + 6, 8, 11, "#9a9aa8"); tR(svg, X + 8, Y + 3, 4, 4, "#9a9aa8"); }
       else if (ch === "v" && hsh % 5 === 0) { tR(svg, X + 7, Y + 7, 5, 5, "#ff8b3d"); }
-      else if (ch === "r" && hsh % 6 === 0) { tR(svg, X + 4, Y + 8, 12, 8, "#55554c"); }
     }
   }
   const pts = [[46, 400]].concat(NODES.map(p => [p.x, p.y]));
@@ -649,7 +686,7 @@ function drawField() {
     const d = Math.sqrt(dx * dx + dy * dy), n2 = Math.max(2, Math.floor(d / 16));
     for (let k = 0; k < n2; k++) {
       const fx = pts[i-1][0] + dx * k / n2, fy = pts[i-1][1] + dy * k / n2;
-      tR(svg, fx - 2.5, fy - 2.5, 5, 5, "#e0b95a");
+      tR(svg, fx - 2.5, fy - 2.5, 5, 5, "#f0d8a0");
     }
   }
   drawCastle(svg, 10, 372);
